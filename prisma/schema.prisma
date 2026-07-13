@@ -1,0 +1,364 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & USERS
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  role          String    @default("OPERATOR") // ADMIN, PURCHASES, FINANCIAL, LOGISTICS, OPERATOR
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  logs          Log[]
+  documents     Document[]
+  privateContacts PrivateContact[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// ============================================
+// PRODUCTS & CATEGORIES
+// ============================================
+
+model Category {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  description   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  products      Product[]
+
+  @@index([name])
+}
+
+model Product {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  name              String
+  description       String?
+  manufacturer      String?
+  categoryId        String
+  purchasePrice     Float
+  salePrice         Float
+  status            String    @default("active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  category          Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  stockItems        Stock[]
+  orderItems        OrderItem[]
+  saleItems         SaleItem[]
+
+  @@index([categoryId])
+  @@index([code])
+  @@index([name])
+  @@index([status])
+}
+
+// ============================================
+// SUPPLIERS
+// ============================================
+
+model Supplier {
+  id            String    @id @default(cuid())
+  company       String    @unique
+  contact       String
+  email         String
+  phone         String
+  country       String
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  purchases     Purchase[]
+
+  @@index([company])
+  @@index([country])
+}
+
+// ============================================
+// STOCK & INVENTORY
+// ============================================
+
+model Stock {
+  id                String    @id @default(cuid())
+  productId         String
+  quantity          Int
+  batchNumber       String
+  trackCode         String
+  expiryDate        DateTime
+  manufacturingDate DateTime
+  location          String
+  supplierId        String?
+  status            String    @default("AVAILABLE")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  movements         StockMovement[]
+
+  @@index([productId])
+  @@index([batchNumber])
+  @@index([trackCode])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+model StockMovement {
+  id                String    @id @default(cuid())
+  stockId           String
+  type              String
+  quantity          Int
+  previousQuantity  Int
+  currentQuantity   Int
+  reference         String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  stock             Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@index([stockId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================
+// INTERNATIONAL PURCHASES
+// ============================================
+
+model Purchase {
+  id                String    @id @default(cuid())
+  purchaseNumber    String    @unique
+  supplierId        String
+  status            String    @default("PENDING")
+  totalAmount       Float
+  currency          String    @default("USD")
+  orderDate         DateTime  @default(now())
+  expectedDate      DateTime?
+  receivedDate      DateTime?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items             PurchaseItem[]
+  payments          Payment[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([purchaseNumber])
+  @@index([orderDate])
+}
+
+model PurchaseItem {
+  id                String    @id @default(cuid())
+  purchaseId        String
+  productId         String
+  quantity          Int
+  unitPrice         Float
+  totalPrice        Float
+  receivedQuantity  Int       @default(0)
+
+  // Relations
+  purchase          Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  purchaseId        String
+  amount            Float
+  status            String    @default("PENDING")
+  method            String
+  reference         String?
+  paidAt            DateTime?
+  dueDate           DateTime
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  purchase          Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([status])
+}
+
+// ============================================
+// BRANCH ORDERS (from subsidiaries)
+// ============================================
+
+model BranchOrder {
+  id                String    @id @default(cuid())
+  orderNumber       String    @unique
+  company           String
+  patient           String?
+  status            String    @default("PENDING")
+  totalAmount       Float
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  items             OrderItem[]
+  documents         Document[]
+  sale              Sale?
+
+  @@index([company])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                String    @id @default(cuid())
+  branchOrderId     String
+  productId         String
+  quantity          Int
+  unitPrice         Float
+  totalPrice        Float
+
+  // Relations
+  branchOrder       BranchOrder @relation(fields: [branchOrderId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([branchOrderId])
+}
+
+// ============================================
+// SALES
+// ============================================
+
+model Sale {
+  id                String    @id @default(cuid())
+  saleNumber        String    @unique
+  branchOrderId     String?   @unique
+  client            String
+  status            String    @default("PENDING")
+  totalAmount       Float
+  paymentMethod     String
+  paymentStatus     String    @default("pending")
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  branchOrder       BranchOrder? @relation(fields: [branchOrderId], references: [id], onDelete: SetNull)
+  items             SaleItem[]
+
+  @@index([branchOrderId])
+  @@index([status])
+  @@index([saleNumber])
+}
+
+model SaleItem {
+  id                String    @id @default(cuid())
+  saleId            String
+  productId         String
+  quantity          Int
+  unitPrice         Float
+  totalPrice        Float
+
+  // Relations
+  sale              Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+}
+
+// ============================================
+// DOCUMENTS
+// ============================================
+
+model Document {
+  id                String    @id @default(cuid())
+  branchOrderId     String?
+  userId            String
+  patientName       String?
+  type              String
+  fileName          String
+  fileUrl           String
+  mimeType          String
+  size              Int
+  uploadedAt        DateTime  @default(now())
+
+  // Relations
+  branchOrder       BranchOrder? @relation(fields: [branchOrderId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([branchOrderId])
+  @@index([userId])
+}
+
+// ============================================
+// PRIVATE CONTACTS
+// ============================================
+
+model PrivateContact {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String
+  company           String?
+  position          String?
+  phone             String?
+  whatsapp          String?
+  email             String?
+  category          String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([name])
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model Log {
+  id                String    @id @default(cuid())
+  userId            String?
+  action            String
+  table             String
+  recordId          String?
+  ipAddress         String?
+  oldData           String?
+  newData           String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  user              User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([table])
+  @@index([action])
+  @@index([createdAt])
+}
