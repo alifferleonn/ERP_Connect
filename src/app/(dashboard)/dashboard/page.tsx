@@ -73,8 +73,9 @@ export default function Page() {
       try {
         const supabase = createClient()
         const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+        const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
         
-        let purchasesQuery = supabase.from('purchases').select('total_amount, created_at')
+        let purchasesQuery = supabase.from('purchases').select('total_amount, created_at, status')
         if (isFilial) {
           purchasesQuery = purchasesQuery.eq('supplier_id', '91b41559-4e56-4301-bae7-38a19b5bf35f')
         }
@@ -88,22 +89,55 @@ export default function Page() {
         ] = await Promise.all([
           supabase.from('products').select('*', { count: 'exact', head: true }),
           supabase.from('suppliers').select('*', { count: 'exact', head: true }),
-          supabase.from('sales').select('total_amount, created_at'),
+          supabase.from('sales').select('total_amount, created_at, customer_name'),
           purchasesQuery
         ])
 
         const rate = await getExchangeRate()
         const multiplier = isFilial ? rate : 1
 
-        const billingTotal = (salesData || []).reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
-        const purchasesTotal = (purchasesData || []).reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
+        // Filter sales by branch
+        const filteredSales = (salesData || []).filter((s) => {
+          if (isFilial) {
+            try {
+              const parsed = JSON.parse(s.customer_name)
+              return parsed.branch === filialName
+            } catch {
+              return false
+            }
+          } else {
+            // Pharmix user
+            try {
+              const parsed = JSON.parse(s.customer_name)
+              return !parsed.branch || parsed.branch === 'pharmix'
+            } catch {
+              // Not JSON, so it belongs to Pharmix
+              return true
+            }
+          }
+        })
+
+        // Filter purchases by branch
+        const filteredPurchases = (purchasesData || []).filter((p) => {
+          const statusStr = p.status || ''
+          const hasSuffix = statusStr.includes('_')
+          const suffix = hasSuffix ? statusStr.split('_')[1] : null
+          if (isFilial) {
+            return suffix === filialName
+          } else {
+            return !suffix || suffix === 'pharmix'
+          }
+        })
+
+        const billingTotal = filteredSales.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
+        const purchasesTotal = filteredPurchases.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
 
         setMetrics({
           billing: billingTotal,
           purchasesTotal: purchasesTotal,
           products: productsCount || 0,
-          salesCount: salesData?.length || 0,
-          purchasesCount: purchasesData?.length || 0,
+          salesCount: filteredSales.length,
+          purchasesCount: filteredPurchases.length,
           suppliers: suppliersCount || 0
         })
 
@@ -112,21 +146,17 @@ export default function Page() {
         const salesMap: Record<string, number> = {}
         const purchasesMap: Record<string, number> = {}
 
-        if (salesData) {
-          salesData.forEach((s) => {
-            const date = new Date(s.created_at)
-            const month = months[date.getMonth()]
-            salesMap[month] = (salesMap[month] || 0) + ((parseFloat(s.total_amount) || 0) * multiplier)
-          })
-        }
+        filteredSales.forEach((s) => {
+          const date = new Date(s.created_at)
+          const month = months[date.getMonth()]
+          salesMap[month] = (salesMap[month] || 0) + (parseFloat(s.total_amount) || 0)
+        })
 
-        if (purchasesData) {
-          purchasesData.forEach((p) => {
-            const date = new Date(p.created_at)
-            const month = months[date.getMonth()]
-            purchasesMap[month] = (purchasesMap[month] || 0) + ((parseFloat(p.total_amount) || 0) * multiplier)
-          })
-        }
+        filteredPurchases.forEach((p) => {
+          const date = new Date(p.created_at)
+          const month = months[date.getMonth()]
+          purchasesMap[month] = (purchasesMap[month] || 0) + ((parseFloat(p.total_amount) || 0) * multiplier)
+        })
 
         const history = months.map(m => ({
           month: m,

@@ -9,7 +9,6 @@ import { Plus, Search, X, Trash2, PackageSearch, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { cn } from '@/lib/utils'
 
 export default function ProductsPage() {
   const { user } = useAuth()
@@ -196,8 +195,6 @@ export default function ProductsPage() {
     }).format(val)
   }
 
-  const getTradeCostPrice = (product: any) => parseFloat(product.sale_price ?? product.purchase_price ?? 0)
-  const getTradeRetailPrice = (product: any) => getTradeCostPrice(product) * 2
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -291,15 +288,17 @@ export default function ProductsPage() {
                   <tr className="bg-secondary/20 border-b border-border/40 text-muted-foreground font-medium text-left">
                     <th className="py-3.5 px-6">Código</th>
                     <th className="py-3.5 px-6">Nome</th>
-                    {user?.filialName === 'trade' ? (
+                    {user?.isFilial ? (
                       <>
                         <th className="py-3.5 px-6 text-right">Custo da Pharmix</th>
                         <th className="py-3.5 px-6 text-right">Preço Venda Final</th>
                       </>
-                    ) : !user?.isFilial ? (
-                      <th className="py-3.5 px-6 text-right">Preço Compra</th>
-                    ) : null}
-                    {!user?.filialName ? <th className="py-3.5 px-6 text-right">Preço Venda</th> : null}
+                    ) : (
+                      <>
+                        <th className="py-3.5 px-6 text-right">Preço Compra</th>
+                        <th className="py-3.5 px-6 text-right">Preço Venda</th>
+                      </>
+                    )}
                     <th className="py-3.5 px-6 text-center">Status</th>
                   </tr>
                 </thead>
@@ -317,24 +316,24 @@ export default function ProductsPage() {
                       <td className="py-3.5 px-6 font-semibold text-foreground">
                         {product.name}
                       </td>
-                      {user?.filialName === 'trade' ? (
+                      {user?.isFilial ? (
                         <>
                           <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
-                            {formatCurrency(getTradeCostPrice(product))}
+                            {formatCurrency(parseFloat(product.sale_price ?? 0))}
                           </td>
                           <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
-                            {formatCurrency(getTradeRetailPrice(product))}
+                            {formatCurrency(parseFloat(product.sale_price ?? 0) * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connect' ? 1.5 : 1))}
                           </td>
                         </>
-                      ) : !user?.isFilial ? (
-                        <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
-                          {formatCurrency(product.purchase_price)}
-                        </td>
-                      ) : null}
-                      {!user?.filialName && (
-                        <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
-                          {formatCurrency(product.sale_price)}
-                        </td>
+                      ) : (
+                        <>
+                          <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
+                            {formatCurrency(product.purchase_price)}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
+                            {formatCurrency(product.sale_price)}
+                          </td>
+                        </>
                       )}
                       <td className="py-3.5 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
@@ -529,30 +528,50 @@ export default function ProductsPage() {
                 </div>
               )}
 
-              <div className={cn("grid gap-4", user?.isFilial ? "grid-cols-1" : "grid-cols-2")}>
-                {!user?.isFilial && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Preço Compra ($ USD) *</label>
-                    <Input 
-                      type="number"
-                      step="0.01"
-                      value={editForm.purchase_price}
-                      onChange={e => setEditForm({...editForm, purchase_price: e.target.value})}
-                      required
-                    />
-                  </div>
+              <div className="grid gap-4 grid-cols-2">
+                {user?.isFilial ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço de Compra (Pharmix) ($ USD)</label>
+                      <Input 
+                        type="number"
+                        value={editForm.sale_price}
+                        disabled
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Venda Final Sugerido ($ USD)</label>
+                      <Input 
+                        type="number"
+                        value={(parseFloat(editForm.sale_price || '0') * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connect' ? 1.5 : 1)).toFixed(2)}
+                        disabled
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço Compra ($ USD) *</label>
+                      <Input 
+                        type="number"
+                        step="0.01"
+                        value={editForm.purchase_price}
+                        onChange={e => setEditForm({...editForm, purchase_price: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço Venda ($ USD) *</label>
+                      <Input 
+                        type="number"
+                        step="0.01"
+                        value={editForm.sale_price}
+                        onChange={e => setEditForm({...editForm, sale_price: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </>
                 )}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Preço Venda ($ USD)</label>
-                  <Input 
-                    type="number"
-                    step="0.01"
-                    value={editForm.sale_price}
-                    onChange={e => setEditForm({...editForm, sale_price: e.target.value})}
-                    disabled={user?.isFilial}
-                    required
-                  />
-                </div>
               </div>
 
               <div className="space-y-1.5">

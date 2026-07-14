@@ -67,12 +67,18 @@ export default function ComprasPage() {
       const { data, error } = await query.order('created_at', { ascending: false })
       if (error) throw error
 
-      const pharmixSupplierId = getPharmixSupplierId()
+      const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+
       const visiblePurchases = (data || []).filter((purchase: any) => {
-        const companyName = purchase.suppliers?.company?.toLowerCase() || ''
-        const supplierId = purchase.supplier_id || purchase.supplierId || ''
-        const isPharmixPurchase = supplierId === pharmixSupplierId || companyName.includes('pharmix')
-        return !isPharmixPurchase || isTradeFilial
+        const statusStr = purchase.status || ''
+        const hasSuffix = statusStr.includes('_')
+        const suffix = hasSuffix ? statusStr.split('_')[1] : null
+
+        if (user?.isFilial) {
+          return suffix === filialName
+        } else {
+          return !suffix || suffix === 'pharmix'
+        }
       })
 
       setPurchases(visiblePurchases)
@@ -103,11 +109,11 @@ export default function ComprasPage() {
   }, [search, user])
 
   useEffect(() => {
-    if (isTradeFilial && suppliers.length > 0) {
+    if (user?.isFilial && suppliers.length > 0) {
       const pharmixId = getPharmixSupplierId(suppliers)
       setForm(prev => ({ ...prev, supplier_id: pharmixId }))
     }
-  }, [isTradeFilial, suppliers, isModalOpen])
+  }, [user?.isFilial, suppliers, isModalOpen])
 
   // Filter products based on supplier
   useEffect(() => {
@@ -132,7 +138,7 @@ export default function ComprasPage() {
   const handleProductChange = (productId: string) => {
     const selectedProd = filteredProducts.find(p => p.id === productId)
     const defaultUnitPrice = selectedProd
-      ? parseFloat(isTradeFilial ? (selectedProd.sale_price ?? selectedProd.purchase_price) : selectedProd.purchase_price)
+      ? parseFloat(user?.isFilial ? (selectedProd.sale_price ?? selectedProd.purchase_price) : selectedProd.purchase_price)
       : 0
 
     setForm(prev => ({
@@ -151,22 +157,26 @@ export default function ComprasPage() {
     setIsSaving(true)
     try {
       const supabase = createClient()
-      const supplierId = isTradeFilial ? getPharmixSupplierId(suppliers) : form.supplier_id
+      const isFilial = user?.isFilial
+      const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+      const supplierId = isFilial ? getPharmixSupplierId(suppliers) : form.supplier_id
+
+      const purchaseStatus = isFilial ? `${form.status}_${filialName}` : form.status
       const { error } = await supabase.from('purchases').insert([{
         supplier_id: supplierId,
         product_id: form.product_id,
         quantity: parseInt(form.quantity),
         unit_price: parseFloat(form.unit_price),
         total_amount: parseFloat(form.total_amount),
-        status: form.status,
+        status: purchaseStatus,
         created_at: new Date().toISOString()
       }])
       if (error) throw error
 
       // If the user is a filial, automatically generate the corresponding sale for Pharmix
-      if (user?.isFilial) {
+      if (isFilial) {
         const { error: autoSaleErr } = await supabase.from('sales').insert([{
-          customer_name: `Filial ${(user.filialName || '').toUpperCase()}`,
+          customer_name: `Filial ${(filialName || '').toUpperCase()}`,
           product_id: form.product_id,
           quantity: parseInt(form.quantity),
           unit_price: parseFloat(form.unit_price),
@@ -179,7 +189,7 @@ export default function ComprasPage() {
       toast.success('Pedido de compra registrado com sucesso!')
       setIsModalOpen(false)
       setForm({
-        supplier_id: isTradeFilial ? getPharmixSupplierId(suppliers) : '',
+        supplier_id: isFilial ? getPharmixSupplierId(suppliers) : '',
         product_id: '',
         quantity: '100',
         unit_price: '',
@@ -196,14 +206,28 @@ export default function ComprasPage() {
 
   const handleOpenDetail = (purchase: any) => {
     setSelectedPurchase(purchase)
-    setEditStatus(purchase.status)
+    const statusParts = purchase.status?.split('_') || []
+    setEditStatus(statusParts[0] || 'PENDENTE')
+
+    // Pre-populate batch entry if details were provided during shipment by Pharmix
+    if (statusParts.length >= 5) {
+      setStockEntry({
+        batch_number: statusParts[2] || '',
+        expiry_date: statusParts[3] || '',
+        track_code: statusParts[4] || ''
+      })
+    } else {
+      setStockEntry({ batch_number: '', expiry_date: '', track_code: '' })
+    }
+
     setShowStockEntryForm(false)
     setIsDetailModalOpen(true)
   }
 
   // Handle click on "Atualizar Status"
   const handleUpdateStatusClick = () => {
-    if (editStatus === 'RECEBIDO' && selectedPurchase.status !== 'RECEBIDO') {
+    const currentStatus = selectedPurchase?.status?.split('_')[0] || ''
+    if (editStatus === 'RECEBIDO' && currentStatus !== 'RECEBIDO') {
       // If updating to RECEBIDO, show the inventory details form first
       setShowStockEntryForm(true)
     } else {
@@ -217,9 +241,10 @@ export default function ComprasPage() {
     setIsSaving(true)
     try {
       const supabase = createClient()
+      const statusValue = user?.isFilial ? `${editStatus}_${user.filialName}` : editStatus
       const { error } = await supabase
         .from('purchases')
-        .update({ status: editStatus })
+        .update({ status: statusValue })
         .eq('id', selectedPurchase.id)
       
       if (error) throw error
@@ -246,9 +271,10 @@ export default function ComprasPage() {
       const supabase = createClient()
 
       // 1. Update purchase status to RECEBIDO
+      const statusValue = user?.isFilial ? `RECEBIDO_${user.filialName}` : 'RECEBIDO'
       const { error: purchaseErr } = await supabase
         .from('purchases')
-        .update({ status: 'RECEBIDO' })
+        .update({ status: statusValue })
         .eq('id', selectedPurchase.id)
       if (purchaseErr) throw purchaseErr
 
@@ -418,11 +444,11 @@ export default function ComprasPage() {
                       <td className="py-3.5 px-6 text-right font-mono font-bold">{formatCurrency(purchase.total_amount)}</td>
                       <td className="py-3.5 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                          purchase.status === 'RECEBIDO'
+                          purchase.status?.split('_')[0] === 'RECEBIDO'
                             ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25'
                             : 'bg-amber-500/10 text-amber-600 border-amber-500/25'
                         }`}>
-                          {purchase.status}
+                          {purchase.status?.split('_')[0]}
                         </span>
                       </td>
                     </tr>

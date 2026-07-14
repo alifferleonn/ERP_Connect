@@ -9,6 +9,36 @@ import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 
+async function getExchangeRate(): Promise<number> {
+  if (typeof window === 'undefined') return 5.0
+  const CACHE_KEY = 'usd_brl_rate'
+  const CACHE_TIME_KEY = 'usd_brl_rate_timestamp'
+  const ONE_HOUR = 60 * 60 * 1000
+
+  const cachedRate = localStorage.getItem(CACHE_KEY)
+  const cachedTime = localStorage.getItem(CACHE_TIME_KEY)
+  const now = Date.now()
+
+  if (cachedRate && cachedTime && (now - parseInt(cachedTime) < ONE_HOUR)) {
+    return parseFloat(cachedRate)
+  }
+
+  try {
+    const response = await fetch('https://open.er-api.com/v6/latest/USD')
+    const data = await response.json()
+    const rate = data.rates?.BRL
+    if (rate) {
+      localStorage.setItem(CACHE_KEY, rate.toString())
+      localStorage.setItem(CACHE_TIME_KEY, now.toString())
+      return rate
+    }
+  } catch (err) {
+    console.error('Error fetching exchange rate:', err)
+  }
+
+  return cachedRate ? parseFloat(cachedRate) : 5.4 // fallback rate
+}
+
 export default function VendasPage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
@@ -48,6 +78,16 @@ export default function VendasPage() {
   // Detail/Edit status state
   const [editStatus, setEditStatus] = useState('PENDENTE')
 
+  // Shipment flow states (for Pharmix sending to Filial)
+  const [isShipmentModalOpen, setIsShipmentModalOpen] = useState(false)
+  const [shipmentTrackCode, setShipmentTrackCode] = useState('')
+  const [shipmentDeficit, setShipmentDeficit] = useState<{
+    needed: number
+    available: number
+    product: any
+  } | null>(null)
+  const [shipmentStockItems, setShipmentStockItems] = useState<any[]>([])
+
   // Load sales and products
   async function loadSales() {
     setIsLoading(true)
@@ -59,7 +99,31 @@ export default function VendasPage() {
       }
       const { data, error } = await query.order('created_at', { ascending: false })
       if (error) throw error
-      setSales(data || [])
+
+      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+      const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+
+      const visibleSales = (data || []).filter((sale: any) => {
+        if (isFilial) {
+          try {
+            const parsed = JSON.parse(sale.customer_name)
+            return parsed.branch === filialName
+          } catch {
+            return false
+          }
+        } else {
+          // Pharmix user
+          try {
+            const parsed = JSON.parse(sale.customer_name)
+            return !parsed.branch || parsed.branch === 'pharmix'
+          } catch {
+            // Not JSON
+            return true
+          }
+        }
+      })
+
+      setSales(visibleSales)
     } catch (err) {
       console.error(err)
     } finally {
@@ -84,7 +148,7 @@ export default function VendasPage() {
   useEffect(() => {
     loadSales()
     loadProducts()
-  }, [search])
+  }, [search, user])
 
   // Compute total value
   useEffect(() => {
@@ -94,18 +158,28 @@ export default function VendasPage() {
     setForm(prev => ({ ...prev, total_amount: total.toFixed(2) }))
   }, [form.quantity, form.unit_price])
 
-  const handleProductChange = (productId: string) => {
+  const handleProductChange = async (productId: string) => {
     const selectedProd = products.find(p => p.id === productId)
     const isTradeFilial = user?.filialName === 'trade'
-    const retailPrice = selectedProd
+    const isConnectFilial = user?.filialName === 'connect'
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+    
+    let retailPrice = selectedProd
       ? parseFloat(selectedProd.sale_price || 0)
       : 0
-    const finalSalePrice = isTradeFilial ? retailPrice * 2 : retailPrice
+
+    if (isFilial) {
+      const rate = await getExchangeRate()
+      retailPrice = retailPrice * rate
+    }
+
+    const defaultMarkup = isTradeFilial ? 2 : isConnectFilial ? 1.5 : 1
+    const finalSalePrice = retailPrice * defaultMarkup
 
     setForm(prev => ({
       ...prev,
       product_id: productId,
-      unit_price: selectedProd ? finalSalePrice.toString() : ''
+      unit_price: selectedProd ? finalSalePrice.toFixed(2) : ''
     }))
   }
 
@@ -122,20 +196,36 @@ export default function VendasPage() {
 
   const createPendingPurchase = async (product: any, needed: number) => {
     const supabase = createClient()
-    const isTradeFilial = user?.filialName === 'trade'
+    const isFilial = user?.isFilial
+    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
     const pharmixSupplierId = product?.suppliers?.company?.toLowerCase().includes('pharmix')
       ? product.suppliers.id
       : '91b41559-4e56-4301-bae7-38a19b5bf35f'
 
-    const purchaseUnitPrice = isTradeFilial
+    const purchaseUnitPrice = isFilial
       ? parseFloat(product.sale_price || product.purchase_price || 0)
       : parseFloat(product.purchase_price || 0)
     const totalPurchaseCost = needed * purchaseUnitPrice
+    
+    const purchaseStatus = isFilial ? `PENDENTE_${filialName}` : 'PENDENTE'
 
     const { error: purchaseErr } = await supabase
       .from('purchases')
       .insert([{
-        supplier_id: isTradeFilial ? pharmixSupplierId : product.supplier_id,
+        supplier_id: isFilial ? pharmixSupplierId : product.supplier_id,
+        product_id: product.id,
+        quantity: needed,
+        unit_price: purchaseUnitPrice,
+        total_amount: totalPurchaseCost,
+        status: purchaseStatus,
+        created_at: new Date().toISOString()
+      }])
+
+    if (purchaseErr) throw purchaseErr
+
+    if (isFilial) {
+      const { error: autoSaleErr } = await supabase.from('sales').insert([{
+        customer_name: `Filial ${(filialName || '').toUpperCase()}`,
         product_id: product.id,
         quantity: needed,
         unit_price: purchaseUnitPrice,
@@ -143,8 +233,8 @@ export default function VendasPage() {
         status: 'PENDENTE',
         created_at: new Date().toISOString()
       }])
-
-    if (purchaseErr) throw purchaseErr
+      if (autoSaleErr) console.error('Erro ao gerar venda automática na Pharmix:', autoSaleErr)
+    }
   }
 
   const handleSaleSubmit = async (e: React.FormEvent) => {
@@ -246,7 +336,8 @@ export default function VendasPage() {
           name: form.customer_name,
           cpf: form.customer_cpf || '',
           email: form.customer_email || '',
-          document_data: form.document_data || ''
+          document_data: form.document_data || '',
+          branch: user.filialName
         })
       }
 
@@ -372,7 +463,179 @@ export default function VendasPage() {
     }
   }
 
+  const handleOpenShipment = async (sale: any) => {
+    try {
+      const supabase = createClient()
+      
+      // Fetch product with suppliers relation
+      const { data: prodData, error: prodErr } = await supabase
+        .from('products')
+        .select('*, suppliers(*)')
+        .eq('id', sale.product_id)
+        .single()
+      if (prodErr) throw prodErr
+
+      // Fetch stock availability in Pharmix
+      const { data: stockItems, error: stockErr } = await supabase
+        .from('stock')
+        .select('*')
+        .eq('product_id', sale.product_id)
+        .gt('quantity', 0)
+        .order('expiry_date', { ascending: true }) // FIFO
+      if (stockErr) throw stockErr
+
+      const availableQty = (stockItems || []).reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+
+      setShipmentStockItems(stockItems || [])
+      setShipmentTrackCode('')
+      setSelectedSale(sale)
+
+      if (availableQty < sale.quantity) {
+        setShipmentDeficit({
+          needed: sale.quantity - availableQty,
+          available: availableQty,
+          product: prodData
+        })
+      } else {
+        setShipmentDeficit(null)
+      }
+      setIsDetailModalOpen(false)
+      setIsShipmentModalOpen(true)
+    } catch (err: any) {
+      toast.error(`Erro ao verificar estoque para envio: ${err.message}`)
+    }
+  }
+
+  const handleExecuteShipment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedSale) return
+    if (!shipmentTrackCode) {
+      toast.error('Informe o código de rastreio')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const supabase = createClient()
+      let remaining = selectedSale.quantity
+      let usedBatchNumber = ''
+      let usedExpiryDate = ''
+
+      for (const item of shipmentStockItems) {
+        if (remaining <= 0) break
+
+        const deduct = Math.min(item.quantity, remaining)
+        const newQty = item.quantity - deduct
+        remaining -= deduct
+
+        if (!usedBatchNumber) {
+          usedBatchNumber = item.batch_number || item.batchNumber || 'LOTE-GENERICO'
+          usedExpiryDate = item.expiry_date || item.expiryDate || new Date().toISOString().split('T')[0]
+        }
+
+        // Update batch quantity
+        const { error: updateErr } = await supabase
+          .from('stock')
+          .update({ 
+            quantity: newQty,
+            status: newQty === 0 ? 'OUT_OF_STOCK' : item.status
+          })
+          .eq('id', item.id)
+        if (updateErr) throw updateErr
+
+        // Register movement
+        const { error: movErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            stock_id: item.id,
+            type: 'Saída',
+            quantity: deduct,
+            reference: `ENVIO-FILIAL-${selectedSale.customer_name}`
+          }])
+        if (movErr) throw movErr
+      }
+
+      // Update Sale status to ENTREGUE
+      const { error: saleErr } = await supabase
+        .from('sales')
+        .update({ status: 'ENTREGUE' })
+        .eq('id', selectedSale.id)
+      if (saleErr) throw saleErr
+
+      // Update matching Branch Purchase to RECEBIDO with details encoded in status
+      const branchName = selectedSale.customer_name.replace('Filial ', '').toLowerCase()
+      
+      const { data: purchaseData, error: findPurchaseErr } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('product_id', selectedSale.product_id)
+        .eq('quantity', selectedSale.quantity)
+        .eq('status', `PENDENTE_${branchName}`)
+        .limit(1)
+
+      if (!findPurchaseErr && purchaseData && purchaseData.length > 0) {
+        const purchaseId = purchaseData[0].id
+        // Format of new status: RECEBIDO_branchName_batch_expiry_track
+        const formattedExpiry = new Date(usedExpiryDate).toISOString().split('T')[0]
+        const statusValue = `RECEBIDO_${branchName}_${usedBatchNumber}_${formattedExpiry}_${shipmentTrackCode}`
+        
+        await supabase
+          .from('purchases')
+          .update({ status: statusValue })
+          .eq('id', purchaseId)
+      }
+
+      toast.success('Envio realizado com sucesso! Estoque da matriz baixado.')
+      setIsShipmentModalOpen(false)
+      loadSales()
+    } catch (err: any) {
+      toast.error(`Erro ao processar envio: ${err.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleGeneratePharmixPurchase = async () => {
+    if (!selectedSale || !shipmentDeficit) return
+    setIsSaving(true)
+    try {
+      const supabase = createClient()
+      const { product, needed } = shipmentDeficit
+
+      const purchaseUnitPrice = parseFloat(product.purchase_price || 0)
+      const totalPurchaseCost = needed * purchaseUnitPrice
+
+      const { error: purchaseErr } = await supabase
+        .from('purchases')
+        .insert([{
+          supplier_id: product.supplier_id,
+          product_id: product.id,
+          quantity: needed,
+          unit_price: purchaseUnitPrice,
+          total_amount: totalPurchaseCost,
+          status: 'PENDENTE',
+          created_at: new Date().toISOString()
+        }])
+      if (purchaseErr) throw purchaseErr
+
+      toast.success(`Pedido de compra de ${needed} un. gerado como PENDENTE na Pharmix para o fornecedor.`);
+      setIsShipmentModalOpen(false);
+      loadSales();
+    } catch (err: any) {
+      toast.error(`Erro ao gerar compra automática na Pharmix: ${err.message}`)
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const formatCurrency = (val: number) => {
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+    if (isFilial) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(val)
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
@@ -417,7 +680,7 @@ export default function VendasPage() {
             Vendas
           </h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie vendas em dólares ($ USD). Clique em um registro para atualizar o status de entrega ou excluir.
+            Gerencie vendas em {user?.isFilial ? 'reais (R$ BRL)' : 'dólares ($ USD)'}. Clique em um registro para atualizar o status de entrega ou excluir.
           </p>
         </div>
         <Button 
@@ -437,7 +700,9 @@ export default function VendasPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/50 bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Faturamento Realizado ($ USD)</CardTitle>
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+              Faturamento Realizado ({user?.isFilial ? 'R$ BRL' : '$ USD'})
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
@@ -660,7 +925,7 @@ export default function VendasPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">
-                      Unitário ($ USD) *
+                      Unitário ({user?.isFilial ? 'R$ BRL' : '$ USD'}) *
                     </label>
                     <Input
                       type="number"
@@ -686,10 +951,10 @@ export default function VendasPage() {
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Total ($ USD)</label>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Total ({user?.isFilial ? 'R$ BRL' : '$ USD'})</label>
                     <Input
                       type="text"
-                      value={form.total_amount ? `$ ${form.total_amount}` : '$ 0.00'}
+                      value={form.total_amount ? `${user?.isFilial ? 'R$' : '$'} ${form.total_amount}` : `${user?.isFilial ? 'R$' : '$'} 0.00`}
                       disabled
                     />
                   </div>
@@ -730,15 +995,15 @@ export default function VendasPage() {
                       <span className="font-bold text-amber-600">{deficitInfo?.needed} un.</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Custo Unitário</span>
-                      <span className="font-mono font-semibold">{formatCurrency(parseFloat(user?.filialName === 'trade' ? (deficitInfo?.product?.sale_price || deficitInfo?.product?.purchase_price || 0) : (deficitInfo?.product?.purchase_price || 0)))}</span>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-border/45 pt-2">
-                      <span className="font-bold text-xs text-foreground">Total da Compra</span>
-                      <span className="font-mono font-extrabold text-foreground">
-                        {formatCurrency(deficitInfo ? deficitInfo.needed * parseFloat(user?.filialName === 'trade' ? (deficitInfo.product.sale_price || deficitInfo.product.purchase_price || 0) : (deficitInfo.product.purchase_price || 0)) : 0)}
-                      </span>
-                    </div>
+                       <span className="text-muted-foreground">Custo Unitário</span>
+                       <span className="font-mono font-semibold">{formatCurrency(parseFloat(user?.isFilial ? (deficitInfo?.product?.sale_price || deficitInfo?.product?.purchase_price || 0) : (deficitInfo?.product?.purchase_price || 0)))}</span>
+                     </div>
+                     <div className="flex items-center justify-between border-t border-border/45 pt-2">
+                       <span className="font-bold text-xs text-foreground">Total da Compra</span>
+                       <span className="font-mono font-extrabold text-foreground">
+                         {formatCurrency(deficitInfo ? deficitInfo.needed * parseFloat(user?.isFilial ? (deficitInfo.product.sale_price || deficitInfo.product.purchase_price || 0) : (deficitInfo.product.purchase_price || 0)) : 0)}
+                       </span>
+                     </div>
                   </div>
                 </div>
 
@@ -848,6 +1113,14 @@ export default function VendasPage() {
 
               {/* Actions Footer */}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
+                {!user?.isFilial && selectedSale.customer_name?.startsWith('Filial ') && selectedSale.status === 'PENDENTE' && (
+                  <Button 
+                    onClick={() => handleOpenShipment(selectedSale)} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors"
+                  >
+                    🚀 Enviar para Filial
+                  </Button>
+                )}
                 <Button 
                   onClick={handleUpdateStatus} 
                   className="w-full" 
@@ -879,6 +1152,104 @@ export default function VendasPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Shipment Modal */}
+      {isShipmentModalOpen && selectedSale && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+              <div>
+                <h2 className="text-lg font-bold">Enviar Pedido para Filial</h2>
+                <p className="text-xs text-muted-foreground">{selectedSale.products?.name} - {selectedSale.quantity} un.</p>
+              </div>
+              <button 
+                onClick={() => setIsShipmentModalOpen(false)} 
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {shipmentDeficit ? (
+              <div className="p-6 space-y-4">
+                <div className="flex items-start gap-3 bg-rose-500/10 p-4 rounded-lg border border-rose-500/20 text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1 text-sm">
+                    <span className="font-bold">Estoque insuficiente na Pharmix!</span>
+                    <p className="text-xs text-muted-foreground">
+                      Você precisa de {selectedSale.quantity} unidades, mas tem apenas {shipmentDeficit.available} no estoque da matriz.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Para poder enviar este produto para a filial, você precisa primeiro comprá-lo do fornecedor genérico. Deseja gerar uma compra automática de <strong>{shipmentDeficit.needed} unidades</strong> na Pharmix?
+                </p>
+
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsShipmentModalOpen(false)}
+                    className="flex-1"
+                  >
+                    Voltar
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={handleGeneratePharmixPurchase} 
+                    className="flex-1 bg-primary text-primary-foreground font-bold"
+                    disabled={isSaving}
+                  >
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Gerar Compra Automática
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleExecuteShipment} className="p-6 space-y-4">
+                <div className="bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+                  <ClipboardList className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <span className="font-bold">Estoque Disponível!</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      A matriz possui estoque suficiente para atender este pedido.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Código de Rastreio (Track Code) *</label>
+                  <Input 
+                    placeholder="Ex: BR123456789XX"
+                    value={shipmentTrackCode}
+                    onChange={e => setShipmentTrackCode(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-border">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsShipmentModalOpen(false)}
+                    className="flex-1"
+                  >
+                    Voltar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                    disabled={isSaving}
+                  >
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirmar Envio
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
