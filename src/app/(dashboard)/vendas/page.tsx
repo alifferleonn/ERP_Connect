@@ -851,8 +851,8 @@ export default function VendasPage() {
 
       {/* Creation / Auto Purchase Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm p-4 flex justify-center items-start sm:items-center animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden my-8 sm:my-0 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
               <h2 className="text-lg font-bold">
                 {!showAutoPurchasePanel ? 'Registrar Venda ($ USD)' : 'Estoque Insuficiente - Compra Semiautomática'}
@@ -1087,8 +1087,8 @@ export default function VendasPage() {
 
       {/* Detail & Edit / Delete Modal */}
       {isDetailModalOpen && selectedSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm p-4 flex justify-center items-start sm:items-center animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden my-8 sm:my-0 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
               <div>
                 <h2 className="text-lg font-bold">Detalhes da Venda</h2>
