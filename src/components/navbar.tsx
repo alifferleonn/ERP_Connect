@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, Settings, User } from 'lucide-react'
+import { Bell, Search, Settings, User, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -9,6 +9,16 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-16 items-center justify-between px-4 gap-4">
+        {/* Hamburger Menu on Mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden flex-shrink-0"
+          onClick={() => window.dispatchEvent(new Event('toggle-sidebar'))}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
         {/* Search */}
         <div className="flex-1 md:max-w-sm">
           <div className="relative">
