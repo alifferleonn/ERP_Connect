@@ -45,6 +45,8 @@ export default function VendasPage() {
   const [sales, setSales] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [clients, setClients] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -136,7 +138,7 @@ export default function VendasPage() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('products')
-        .select('*, suppliers(company)')
+        .select('*, suppliers(id, company)')
         .eq('status', 'Ativo')
       if (error) throw error
       setProducts(data || [])
@@ -145,9 +147,29 @@ export default function VendasPage() {
     }
   }
 
+  async function loadRelations() {
+    try {
+      const supabase = createClient()
+      const [supsRes, clientsRes] = await Promise.all([
+        supabase.from('suppliers').select('id, company'),
+        supabase.from('suppliers').select('*').eq('country', 'Cliente')
+      ])
+      setSuppliers(supsRes.data || [])
+      setClients(clientsRes.data || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const getPharmixSupplierId = (supplierList: any[] = suppliers) => {
+    const pharmix = supplierList.find((supplier) => supplier.company?.toLowerCase().includes('pharmix'))
+    return pharmix?.id || '91b41559-4e56-4301-bae7-38a19b5bf35f'
+  }
+
   useEffect(() => {
     loadSales()
     loadProducts()
+    loadRelations()
   }, [search, user])
 
   // Compute total value
@@ -198,9 +220,7 @@ export default function VendasPage() {
     const supabase = createClient()
     const isFilial = user?.isFilial
     const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
-    const pharmixSupplierId = product?.suppliers?.company?.toLowerCase().includes('pharmix')
-      ? product.suppliers.id
-      : '91b41559-4e56-4301-bae7-38a19b5bf35f'
+    const pharmixSupplierId = getPharmixSupplierId(suppliers)
 
     const purchaseUnitPrice = isFilial
       ? parseFloat(product.sale_price || product.purchase_price || 0)
@@ -850,6 +870,34 @@ export default function VendasPage() {
             {!showAutoPurchasePanel ? (
               /* Regular Sales Form */
               <form onSubmit={handleSaleSubmit} className="p-6 space-y-4">
+                {user?.isFilial && clients.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Selecionar Cliente Cadastrado (Opcional)</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                      value=""
+                      onChange={e => {
+                        const selected = clients.find(c => c.id === e.target.value)
+                        if (selected) {
+                          setForm(prev => ({
+                            ...prev,
+                            customer_name: selected.company,
+                            customer_email: selected.email || '',
+                            customer_cpf: selected.contact || '',
+                          }))
+                        }
+                      }}
+                    >
+                      <option value="">-- Escolha um cliente --</option>
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.company} {c.contact ? `(${c.contact})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Nome do Cliente / Empresa *</label>
                   <Input

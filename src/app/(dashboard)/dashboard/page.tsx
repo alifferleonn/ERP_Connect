@@ -66,6 +66,7 @@ export default function Page() {
     suppliers: 0
   })
   const [salesHistory, setSalesHistory] = useState<any[]>([])
+  const [filterRange, setFilterRange] = useState<'year' | '3months' | 'thismonth'>('year')
 
   useEffect(() => {
     setMounted(true)
@@ -96,8 +97,24 @@ export default function Page() {
         const rate = await getExchangeRate()
         const multiplier = isFilial ? rate : 1
 
-        // Filter sales by branch
+        const nowRange = new Date()
+        let minDate: Date | null = null
+
+        if (filterRange === '3months') {
+          minDate = new Date()
+          minDate.setMonth(nowRange.getMonth() - 3)
+        } else if (filterRange === 'thismonth') {
+          minDate = new Date(nowRange.getFullYear(), nowRange.getMonth(), 1)
+        } else if (filterRange === 'year') {
+          minDate = new Date()
+          minDate.setFullYear(nowRange.getFullYear() - 1)
+        }
+
+        // Filter sales by branch and date
         const filteredSales = (salesData || []).filter((s) => {
+          const date = new Date(s.created_at)
+          if (minDate && date < minDate) return false
+
           if (isFilial) {
             try {
               const parsed = JSON.parse(s.customer_name)
@@ -117,8 +134,11 @@ export default function Page() {
           }
         })
 
-        // Filter purchases by branch
+        // Filter purchases by branch and date
         const filteredPurchases = (purchasesData || []).filter((p) => {
+          const date = new Date(p.created_at)
+          if (minDate && date < minDate) return false
+
           const statusStr = p.status || ''
           const hasSuffix = statusStr.includes('_')
           const suffix = hasSuffix ? statusStr.split('_')[1] : null
@@ -141,28 +161,90 @@ export default function Page() {
           suppliers: suppliersCount || 0
         })
 
-        // Generate dynamic sales vs purchases monthly chart data
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-        const salesMap: Record<string, number> = {}
-        const purchasesMap: Record<string, number> = {}
+        // Generate dynamic sales vs purchases chart data based on filter range
+        let history: any[] = []
 
-        filteredSales.forEach((s) => {
-          const date = new Date(s.created_at)
-          const month = months[date.getMonth()]
-          salesMap[month] = (salesMap[month] || 0) + (parseFloat(s.total_amount) || 0)
-        })
+        if (filterRange === 'thismonth') {
+          const daysInMonth = new Date(nowRange.getFullYear(), nowRange.getMonth() + 1, 0).getDate()
+          for (let day = 1; day <= daysInMonth; day++) {
+            const salesVal = filteredSales
+              .filter(s => {
+                const sDate = new Date(s.created_at)
+                return sDate.getDate() === day && sDate.getMonth() === nowRange.getMonth() && sDate.getFullYear() === nowRange.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
 
-        filteredPurchases.forEach((p) => {
-          const date = new Date(p.created_at)
-          const month = months[date.getMonth()]
-          purchasesMap[month] = (purchasesMap[month] || 0) + ((parseFloat(p.total_amount) || 0) * multiplier)
-        })
+            const purchasesVal = filteredPurchases
+              .filter(p => {
+                const pDate = new Date(p.created_at)
+                return pDate.getDate() === day && pDate.getMonth() === nowRange.getMonth() && pDate.getFullYear() === nowRange.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
 
-        const history = months.map(m => ({
-          month: m,
-          vendas: salesMap[m] || 0,
-          compras: purchasesMap[m] || 0
-        }))
+            history.push({
+              name: `${day.toString().padStart(2, '0')}`,
+              vendas: salesVal,
+              compras: purchasesVal
+            })
+          }
+        } else if (filterRange === '3months') {
+          const monthsLabel = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+          for (let i = 2; i >= 0; i--) {
+            const d = new Date()
+            d.setMonth(nowRange.getMonth() - i)
+            const mLabel = monthsLabel[d.getMonth()]
+            const yearSuffix = d.getFullYear().toString().substring(2)
+
+            const salesVal = filteredSales
+              .filter(s => {
+                const sDate = new Date(s.created_at)
+                return sDate.getMonth() === d.getMonth() && sDate.getFullYear() === d.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
+
+            const purchasesVal = filteredPurchases
+              .filter(p => {
+                const pDate = new Date(p.created_at)
+                return pDate.getMonth() === d.getMonth() && pDate.getFullYear() === d.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
+
+            history.push({
+              name: `${mLabel}/${yearSuffix}`,
+              vendas: salesVal,
+              compras: purchasesVal
+            })
+          }
+        } else {
+          // Last Year (12 Months)
+          const monthsLabel = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+          for (let i = 11; i >= 0; i--) {
+            const d = new Date()
+            d.setMonth(nowRange.getMonth() - i)
+            const mLabel = monthsLabel[d.getMonth()]
+            const yearSuffix = d.getFullYear().toString().substring(2)
+
+            const salesVal = filteredSales
+              .filter(s => {
+                const sDate = new Date(s.created_at)
+                return sDate.getMonth() === d.getMonth() && sDate.getFullYear() === d.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
+
+            const purchasesVal = filteredPurchases
+              .filter(p => {
+                const pDate = new Date(p.created_at)
+                return pDate.getMonth() === d.getMonth() && pDate.getFullYear() === d.getFullYear()
+              })
+              .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
+
+            history.push({
+              name: `${mLabel}/${yearSuffix}`,
+              vendas: salesVal,
+              compras: purchasesVal
+            })
+          }
+        }
 
         // Only display chart if there is actual activity
         const hasActivity = history.some(h => h.vendas > 0 || h.compras > 0)
@@ -175,7 +257,7 @@ export default function Page() {
       }
     }
     loadData()
-  }, [user])
+  }, [user, filterRange])
 
   if (!mounted) return null
 
@@ -246,16 +328,52 @@ export default function Page() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-          Dashboard {user?.isFilial && ` - ${user.filialName?.toUpperCase()}`}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          {isFilial 
-            ? 'Visão geral com dados e valores em reais (R$ BRL) convertidos a cada 1 hora.'
-            : 'Visão geral com dados e valores em dólares ($ USD) reais do seu Supabase.'
-          }
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            Dashboard {user?.isFilial && ` - ${user.filialName?.toUpperCase()}`}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {isFilial 
+              ? 'Visão geral com dados e valores em reais (R$ BRL) convertidos a cada 1 hora.'
+              : 'Visão geral com dados e valores em dólares ($ USD) reais do seu Supabase.'
+            }
+          </p>
+        </div>
+
+        {/* Date Range Selector */}
+        <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-lg border border-border/40 self-start md:self-auto">
+          <button
+            onClick={() => setFilterRange('thismonth')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              filterRange === 'thismonth' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+            }`}
+          >
+            Neste Mês
+          </button>
+          <button
+            onClick={() => setFilterRange('3months')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              filterRange === '3months' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+            }`}
+          >
+            Últimos 3 Meses
+          </button>
+          <button
+            onClick={() => setFilterRange('year')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              filterRange === 'year' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+            }`}
+          >
+            Último Ano
+          </button>
+        </div>
       </div>
 
       {/* Metrics Grid */}
@@ -316,7 +434,7 @@ export default function Page() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
                   <Tooltip 
                     contentStyle={{ 
