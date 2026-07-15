@@ -22,7 +22,7 @@ export function useAuth() {
         const { data: { user: supabaseUser } } = await supabase.auth.getUser()
         if (supabaseUser && supabaseUser.email) {
           const email = supabaseUser.email.toLowerCase()
-          const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.endsWith('@connect.com') || email.endsWith('@connecthealth.com')
+          const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect')
           const filialName = email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null
 
           setUser({
@@ -47,7 +47,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.email) {
         const email = session.user.email.toLowerCase()
-        const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.endsWith('@connect.com') || email.endsWith('@connecthealth.com')
+        const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect')
         const filialName = email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null
 
         setUser({

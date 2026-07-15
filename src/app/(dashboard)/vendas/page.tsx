@@ -102,7 +102,7 @@ export default function VendasPage() {
       const { data, error } = await query.order('created_at', { ascending: false })
       if (error) throw error
 
-      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
+      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
       const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : null)
 
       const visibleSales = (data || []).filter((sale: any) => {
@@ -185,7 +185,7 @@ export default function VendasPage() {
     const isTradeFilial = user?.filialName === 'trade'
     const isConnectHealthFilial = user?.filialName === 'connecthealth'
     const isConnectFilial = user?.filialName === 'connect'
-    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
     
     let retailPrice = selectedProd
       ? parseFloat(selectedProd.sale_price || 0)
@@ -650,7 +650,7 @@ export default function VendasPage() {
   }
 
   const formatCurrency = (val: number) => {
-    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
     if (isFilial) {
       return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
