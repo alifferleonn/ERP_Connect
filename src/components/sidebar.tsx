@@ -9,7 +9,6 @@ import {
   Boxes,
   DollarSign,
   LogOut,
-  Menu,
   ShoppingCart,
   Users,
   X,
