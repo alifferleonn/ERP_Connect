@@ -73,8 +73,8 @@ export default function Page() {
     async function loadData() {
       try {
         const supabase = createClient()
-        const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
-        const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+        const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
+        const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : null)
         
         let purchasesQuery = supabase.from('purchases').select('total_amount, created_at, status')
         if (isFilial) {
@@ -284,7 +284,7 @@ export default function Page() {
     )
   }
 
-  const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+  const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
 
   const formatCurrency = (val: number) => {
     if (isFilial) {

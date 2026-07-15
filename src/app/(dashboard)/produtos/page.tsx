@@ -318,12 +318,12 @@ export default function ProductsPage() {
                       </td>
                       {user?.isFilial ? (
                         <>
-                          <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
-                            {formatCurrency(parseFloat(product.sale_price ?? 0))}
-                          </td>
-                          <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
-                            {formatCurrency(parseFloat(product.sale_price ?? 0) * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connect' ? 1.5 : 1))}
-                          </td>
+                           <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
+                             {formatCurrency(parseFloat(product.sale_price ?? 0))}
+                           </td>
+                           <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
+                             {formatCurrency(parseFloat(product.sale_price ?? 0) * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connecthealth' ? 1.8 : user?.filialName === 'connect' ? 1.5 : 1))}
+                           </td>
                         </>
                       ) : (
                         <>
@@ -540,12 +540,12 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Venda Final Sugerido ($ USD)</label>
-                      <Input 
-                        type="number"
-                        value={(parseFloat(editForm.sale_price || '0') * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connect' ? 1.5 : 1)).toFixed(2)}
-                        disabled
-                      />
+                       <label className="text-xs font-semibold text-muted-foreground uppercase">Venda Final Sugerido ($ USD)</label>
+                       <Input 
+                         type="number"
+                         value={(parseFloat(editForm.sale_price || '0') * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connecthealth' ? 1.8 : user?.filialName === 'connect' ? 1.5 : 1)).toFixed(2)}
+                         disabled
+                       />
                     </div>
                   </>
                 ) : (

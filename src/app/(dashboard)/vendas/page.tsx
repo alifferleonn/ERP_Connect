@@ -102,8 +102,8 @@ export default function VendasPage() {
       const { data, error } = await query.order('created_at', { ascending: false })
       if (error) throw error
 
-      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
-      const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
+      const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : null)
 
       const visibleSales = (data || []).filter((sale: any) => {
         if (isFilial) {
@@ -183,8 +183,9 @@ export default function VendasPage() {
   const handleProductChange = async (productId: string) => {
     const selectedProd = products.find(p => p.id === productId)
     const isTradeFilial = user?.filialName === 'trade'
+    const isConnectHealthFilial = user?.filialName === 'connecthealth'
     const isConnectFilial = user?.filialName === 'connect'
-    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com')))
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.endsWith('@connect.com') || user.email.endsWith('@connecthealth.com')))
     
     let retailPrice = selectedProd
       ? parseFloat(selectedProd.sale_price || 0)
@@ -195,7 +196,7 @@ export default function VendasPage() {
       retailPrice = retailPrice * rate
     }
 
-    const defaultMarkup = isTradeFilial ? 2 : isConnectFilial ? 1.5 : 1
+    const defaultMarkup = isTradeFilial ? 2 : isConnectHealthFilial ? 1.8 : isConnectFilial ? 1.5 : 1
     const finalSalePrice = retailPrice * defaultMarkup
 
     setForm(prev => ({
