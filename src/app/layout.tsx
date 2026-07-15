@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { Providers } from '@/components/providers'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import '@/app/globals.css'
 
 export const metadata: Metadata = {
@@ -83,7 +84,10 @@ export default function RootLayout({
         </style>
       </head>
       <body className="bg-background text-foreground">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <SpeedInsights />
+        </Providers>
       </body>
     </html>
   )
