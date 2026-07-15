@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 
 export function Navbar() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <header className="fixed top-0 left-0 right-0 z-40 md:sticky md:top-0 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="flex h-16 items-center justify-between px-4 gap-4">
         {/* Hamburger Menu on Mobile */}
         <Button
