@@ -133,6 +133,8 @@ export default function VendasPage() {
     needed: number
     available: number
     product: any
+    stockItems?: any[]
+    sellQty?: number
   } | null>(null)
 
   // Form states
@@ -369,7 +371,9 @@ export default function VendasPage() {
           setDeficitInfo({
             needed,
             available: availableQty,
-            product: selectedProd
+            product: selectedProd,
+            stockItems,
+            sellQty
           })
           setShowAutoPurchasePanel(true)
           setIsSaving(false)
@@ -475,25 +479,17 @@ export default function VendasPage() {
     if (!deficitInfo) return
     setIsSaving(true)
     try {
-      const { needed, product } = deficitInfo
+      const { needed, product, stockItems = [], sellQty = 0 } = deficitInfo
       await createPendingPurchase(product, needed)
+      
+      // Execute and persist the sale as well
+      await executeSaleAndDeductStock(stockItems, sellQty)
 
-      toast.warning(`Pedido de compra de ${needed} un. gerado como PENDENTE para ${product.suppliers?.company}. A venda atual não pôde ser finalizada e foi cancelada por falta de estoque físico.`);
+      toast.success(`Pedido de compra de ${needed} un. gerado como PENDENTE para ${product.suppliers?.company || 'Matriz'} e venda registrada!`);
 
       setIsModalOpen(false)
       setShowAutoPurchasePanel(false)
       setDeficitInfo(null)
-      setForm({
-        customer_name: '',
-        customer_cpf: '',
-        customer_email: '',
-        document_data: '',
-        product_id: '',
-        quantity: '1',
-        unit_price: '',
-        total_amount: '',
-        status: 'PENDENTE'
-      })
     } catch (err: any) {
       toast.error(`Erro ao gerar compra semiautomática: ${err.message}`)
     } finally {
