@@ -52,7 +52,7 @@ model Category {
 
 model Product {
   id                String    @id @default(cuid())
-  code              String    @unique
+  code              String
   name              String
   description       String?
   manufacturer      String?
