@@ -48,6 +48,77 @@ export default function VendasPage() {
   const [clients, setClients] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   
+  // States for searchable product input
+  const [productSearch, setProductSearch] = useState('')
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false)
+  const [exchangeRate, setExchangeRate] = useState(5.4)
+
+  useEffect(() => {
+    getExchangeRate().then(rate => setExchangeRate(rate))
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showProductSuggestions && !(e.target as HTMLElement).closest('.product-suggestions-container')) {
+        setShowProductSuggestions(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showProductSuggestions])
+
+  const getProductFinalPrice = (product: any) => {
+    if (!product) return 0
+    let price = parseFloat(product.sale_price || 0)
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+    if (isFilial) {
+      price = price * exchangeRate
+      const isTradeFilial = user?.filialName === 'trade'
+      const isConnectHealthFilial = user?.filialName === 'connecthealth'
+      const isConnectFilial = user?.filialName === 'connect'
+      const defaultMarkup = isTradeFilial ? 2 : isConnectHealthFilial ? 1.8 : isConnectFilial ? 1.5 : 1
+      price = price * defaultMarkup
+    }
+    return price
+  }
+
+  const getFilteredProducts = () => {
+    if (!productSearch) return []
+    const query = productSearch.toLowerCase()
+    
+    const filtered = products.filter(p => 
+      p.name.toLowerCase().includes(query) || 
+      (p.code && p.code.toLowerCase().includes(query))
+    )
+
+    const cheapestMap: { [key: string]: any } = {}
+    filtered.forEach(p => {
+      const activePrinciple = p.code || ''
+      if (activePrinciple) {
+        const price = getProductFinalPrice(p)
+        if (!cheapestMap[activePrinciple] || price < getProductFinalPrice(cheapestMap[activePrinciple])) {
+          cheapestMap[activePrinciple] = p
+        }
+      }
+    })
+
+    return filtered.map(p => {
+      const activePrinciple = p.code || ''
+      const isCheapest = activePrinciple && cheapestMap[activePrinciple]?.id === p.id
+      return {
+        ...p,
+        isCheapest
+      }
+    }).sort((a, b) => {
+      const aMatchesCode = a.code?.toLowerCase().includes(query)
+      const bMatchesCode = b.code?.toLowerCase().includes(query)
+      if (aMatchesCode && bMatchesCode) {
+        return getProductFinalPrice(a) - getProductFinalPrice(b)
+      }
+      return 0
+    })
+  }
+
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
@@ -709,6 +780,8 @@ export default function VendasPage() {
           onClick={() => {
             setShowAutoPurchasePanel(false);
             setDeficitInfo(null);
+            setProductSearch('');
+            setShowProductSuggestions(false);
             setIsModalOpen(true);
           }}
         >
@@ -946,19 +1019,82 @@ export default function VendasPage() {
                   </>
                 )}
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 product-suggestions-container relative">
                   <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Produto / Medicamento *</label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
-                    value={form.product_id}
-                    onChange={e => handleProductChange(e.target.value)}
-                    required
-                  >
-                    <option value="">Selecione um produto...</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <Input
+                      placeholder="Pesquise por medicamento ou princípio ativo..."
+                      value={productSearch}
+                      onChange={e => {
+                        setProductSearch(e.target.value)
+                        setShowProductSuggestions(true)
+                        if (!e.target.value) {
+                          setForm(prev => ({ ...prev, product_id: '', unit_price: '' }))
+                        }
+                      }}
+                      onFocus={() => setShowProductSuggestions(true)}
+                      required
+                    />
+                    {productSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProductSearch('')
+                          setShowProductSuggestions(false)
+                          setForm(prev => ({ ...prev, product_id: '', unit_price: '' }))
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {showProductSuggestions && productSearch && (
+                    <div className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-card shadow-lg animate-in fade-in duration-100">
+                      {getFilteredProducts().length === 0 ? (
+                        <div className="p-3 text-xs text-muted-foreground text-center">
+                          Nenhum produto encontrado.
+                        </div>
+                      ) : (
+                        getFilteredProducts().map(p => {
+                          const finalPrice = getProductFinalPrice(p)
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setProductSearch(`${p.name} (${p.code || 'S/ Princípio'})`)
+                                setForm(prev => ({ ...prev, product_id: p.id }))
+                                handleProductChange(p.id)
+                                setShowProductSuggestions(false)
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-xs hover:bg-secondary/80 flex items-center justify-between border-b border-border/20 last:border-0 transition-colors"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="font-semibold text-foreground">{p.name}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  Princípio Ativo: <span className="font-medium text-foreground">{p.code || 'N/A'}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {p.isCheapest && (
+                                  <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/25 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                    Mais Barato
+                                  </span>
+                                )}
+                                <span className="font-mono font-bold text-primary">
+                                  {formatCurrency(finalPrice)}
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
+                  {/* Keep a hidden input to enforce standard HTML form validation if required is passed */}
+                  <input type="hidden" name="product_id" value={form.product_id} required />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

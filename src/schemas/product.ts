@@ -4,8 +4,8 @@ import { z } from 'zod'
 export const createProductSchema = z.object({
   code: z
     .string()
-    .min(1, 'Código é obrigatório')
-    .max(50, 'Código deve ter no máximo 50 caracteres'),
+    .min(1, 'Princípio ativo é obrigatório')
+    .max(50, 'Princípio ativo deve ter no máximo 50 caracteres'),
   name: z
     .string()
     .min(1, 'Nome é obrigatório')

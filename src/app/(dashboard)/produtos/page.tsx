@@ -225,7 +225,7 @@ export default function ProductsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             ref={searchInputRef}
-            placeholder="Buscar produtos por nome ou código..."
+            placeholder="Buscar produtos por nome ou princípio ativo..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -286,7 +286,7 @@ export default function ProductsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-secondary/20 border-b border-border/40 text-muted-foreground font-medium text-left">
-                    <th className="py-3.5 px-6">Código</th>
+                    <th className="py-3.5 px-6">Princípio Ativo</th>
                     <th className="py-3.5 px-6">Nome</th>
                     {user?.isFilial ? (
                       <>
@@ -369,9 +369,9 @@ export default function ProductsPage() {
             <form onSubmit={handleCreateProduct} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5 col-span-1">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Código *</label>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Princípio Ativo *</label>
                   <Input 
-                    placeholder="Ex: PRD-001" 
+                    placeholder="Ex: Paracetamol" 
                     value={form.code}
                     onChange={e => setForm({...form, code: e.target.value})}
                     required
@@ -479,8 +479,9 @@ export default function ProductsPage() {
             <form onSubmit={user?.isFilial ? (e) => { e.preventDefault(); setIsDetailModalOpen(false); } : handleUpdateProduct} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5 col-span-1">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Código</label>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Princípio Ativo</label>
                   <Input 
+                    placeholder="Ex: Paracetamol"
                     value={editForm.code}
                     onChange={e => setEditForm({...editForm, code: e.target.value})}
                     disabled={user?.isFilial}
