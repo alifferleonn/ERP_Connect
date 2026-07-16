@@ -361,7 +361,11 @@ export default function VendasPage() {
         .order('expiry_date', { ascending: true }) // FIFO
       if (stockErr) throw stockErr
 
-      const availableQty = (stockItems || []).reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+
+      // Filials always request from Pharmix, so their local available stock is treated as 0
+      const availableQty = isFilial ? 0 : (stockItems || []).reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+      const stockItemsToDeduct = isFilial ? [] : (stockItems || [])
       const isTradeFilial = user?.filialName === 'trade'
 
       if (availableQty < sellQty) {
@@ -372,7 +376,7 @@ export default function VendasPage() {
             needed,
             available: availableQty,
             product: selectedProd,
-            stockItems,
+            stockItems: stockItemsToDeduct,
             sellQty
           })
           setShowAutoPurchasePanel(true)
@@ -383,7 +387,7 @@ export default function VendasPage() {
         await createPendingPurchase(selectedProd, needed)
       }
 
-      await executeSaleAndDeductStock(stockItems, sellQty)
+      await executeSaleAndDeductStock(stockItemsToDeduct, sellQty)
     } catch (err: any) {
       toast.error(`Erro ao processar venda: ${err.message}`)
       setIsSaving(false)
