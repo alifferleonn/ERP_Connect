@@ -83,13 +83,14 @@ export default function VendasPage() {
   }
 
   const getFilteredProducts = () => {
-    if (!productSearch) return []
     const query = productSearch.toLowerCase()
     
-    const filtered = products.filter(p => 
-      p.name.toLowerCase().includes(query) || 
-      (p.code && p.code.toLowerCase().includes(query))
-    )
+    const filtered = query
+      ? products.filter(p => 
+          p.name.toLowerCase().includes(query) || 
+          (p.code && p.code.toLowerCase().includes(query))
+        )
+      : products
 
     const cheapestMap: { [key: string]: any } = {}
     filtered.forEach(p => {
@@ -110,12 +111,14 @@ export default function VendasPage() {
         isCheapest
       }
     }).sort((a, b) => {
-      const aMatchesCode = a.code?.toLowerCase().includes(query)
-      const bMatchesCode = b.code?.toLowerCase().includes(query)
-      if (aMatchesCode && bMatchesCode) {
-        return getProductFinalPrice(a) - getProductFinalPrice(b)
+      if (query) {
+        const aMatchesCode = a.code?.toLowerCase().includes(query)
+        const bMatchesCode = b.code?.toLowerCase().includes(query)
+        if (aMatchesCode && bMatchesCode) {
+          return getProductFinalPrice(a) - getProductFinalPrice(b)
+        }
       }
-      return 0
+      return a.name.localeCompare(b.name)
     })
   }
 
@@ -1050,7 +1053,7 @@ export default function VendasPage() {
                     )}
                   </div>
 
-                  {showProductSuggestions && productSearch && (
+                  {showProductSuggestions && (
                     <div className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-card shadow-lg animate-in fade-in duration-100">
                       {getFilteredProducts().length === 0 ? (
                         <div className="p-3 text-xs text-muted-foreground text-center">
