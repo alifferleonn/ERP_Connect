@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +23,18 @@ import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 
 export default function EstoquePage() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && user?.isFilial) {
+      router.replace('/dashboard')
+      toast.error('Acesso negado: Filiais não possuem acesso ao estoque.')
+    }
+  }, [user, loading, router])
+
   const [search, setSearch] = useState('')
+
   const [stockItems, setStockItems] = useState<any[]>([])
   const [movements, setMovements] = useState<any[]>([])
   const [purchases, setPurchases] = useState<any[]>([])
@@ -180,10 +193,22 @@ export default function EstoquePage() {
     }
   }
 
+  if (loading || user?.isFilial) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-sm font-semibold">
+          Verificando permissões de acesso...
+        </div>
+      </div>
+    )
+  }
+
   const totalStockQuantity = stockItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
   const totalIncomingQuantity = incomingPurchases.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
 
   return (
+
+
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">

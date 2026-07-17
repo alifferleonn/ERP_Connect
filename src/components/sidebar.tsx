@@ -34,7 +34,6 @@ export function Sidebar() {
         { href: '/produtos', label: 'Produtos', icon: Box },
         { href: '/compras', label: 'Compras', icon: ShoppingCart },
         { href: '/contatos', label: 'Contatos de Clientes', icon: Users },
-        { href: '/estoque', label: 'Estoque', icon: Boxes },
         { href: '/vendas', label: 'Vendas', icon: DollarSign },
       ]
     : [
@@ -45,6 +44,7 @@ export function Sidebar() {
         { href: '/estoque', label: 'Estoque', icon: Boxes },
         { href: '/vendas', label: 'Vendas', icon: DollarSign },
       ]
+
 
   return (
     <>
