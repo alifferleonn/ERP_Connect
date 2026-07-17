@@ -290,7 +290,7 @@ export default function ProductsPage() {
                     <th className="py-3.5 px-6">Nome</th>
                     {user?.isFilial ? (
                       <>
-                        <th className="py-3.5 px-6 text-right">Custo da Pharmix</th>
+                        <th className="py-3.5 px-6 text-right">Custo da Filial</th>
                         <th className="py-3.5 px-6 text-right">Preço Venda Final</th>
                       </>
                     ) : (
@@ -532,8 +532,8 @@ export default function ProductsPage() {
               <div className="grid gap-4 grid-cols-2">
                 {user?.isFilial ? (
                   <>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço de Compra (Pharmix) ($ USD)</label>
+                     <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço de Custo (Filial) ($ USD)</label>
                       <Input 
                         type="number"
                         value={editForm.sale_price}
