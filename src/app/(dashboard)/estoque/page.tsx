@@ -17,7 +17,11 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowUpDown,
-  Calendar
+  Calendar,
+  Pencil,
+  Loader2,
+  CalendarCheck,
+  ClipboardList
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
@@ -42,6 +46,27 @@ export default function EstoquePage() {
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentTab, setCurrentTab] = useState<'disponivel' | 'entradas' | 'saidas' | 'para_entrar'>('disponivel')
+
+  // Manual movement form state
+  const [isMovementModalOpen, setIsMovementModalOpen] = useState(false)
+  const [movementForm, setMovementForm] = useState({
+    product_id: '',
+    type: 'Entrada', // 'Entrada' | 'Saída'
+    quantity: '10',
+    batch_number: '',
+    expiry_date: '',
+    reference: 'Ajuste de Inventário',
+    selected_stock_id: ''
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Batch editing form state
+  const [isEditBatchModalOpen, setIsEditBatchModalOpen] = useState(false)
+  const [selectedBatchToEdit, setSelectedBatchToEdit] = useState<any>(null)
+  const [editBatchForm, setEditBatchForm] = useState({
+    batch_number: '',
+    expiry_date: ''
+  })
 
   const getExpiryStatusInfo = (expiryDateStr: string) => {
     if (!expiryDateStr) return { label: 'Disponível', badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 dark:text-emerald-400' }
@@ -158,6 +183,165 @@ export default function EstoquePage() {
     } catch (err: any) {
       toast.error(`Erro ao registrar devolução: ${err.message}`)
       setIsLoading(false)
+    }
+  }
+
+  const handleSaveMovement = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!movementForm.product_id || !movementForm.quantity || !movementForm.type) {
+      toast.error('Preencha os campos obrigatórios')
+      return
+    }
+
+    const qty = parseInt(movementForm.quantity)
+    if (isNaN(qty) || qty <= 0) {
+      toast.error('A quantidade deve ser um número maior que zero')
+      return
+    }
+
+    if (movementForm.type === 'Entrada') {
+      if (!movementForm.batch_number || !movementForm.expiry_date) {
+        toast.error('Preencha o lote e a validade para movimentações de entrada')
+        return
+      }
+    } else {
+      if (!movementForm.selected_stock_id) {
+        toast.error('Selecione de qual lote deseja retirar as unidades')
+        return
+      }
+    }
+
+    setIsSaving(true)
+    try {
+      const supabase = createClient()
+
+      if (movementForm.type === 'Entrada') {
+        // 1. Create stock item
+        const { data: stockData, error: stockErr } = await supabase
+          .from('stock')
+          .insert([{
+            product_id: movementForm.product_id,
+            quantity: qty,
+            batch_number: movementForm.batch_number,
+            expiry_date: movementForm.expiry_date,
+            status: 'AVAILABLE'
+          }])
+          .select()
+          .single()
+        if (stockErr) throw stockErr
+
+        // 2. Create movement
+        const { error: movErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            stock_id: stockData.id,
+            type: 'Entrada',
+            quantity: qty,
+            reference: movementForm.reference || 'Entrada Manual'
+          }])
+        if (movErr) throw movErr
+
+      } else {
+        // Saída
+        // 1. Fetch current stock item
+        const { data: currentStock, error: fetchErr } = await supabase
+          .from('stock')
+          .select('quantity, batch_number')
+          .eq('id', movementForm.selected_stock_id)
+          .single()
+        if (fetchErr) throw fetchErr
+
+        if (currentStock.quantity < qty) {
+          throw new Error(`Estoque insuficiente neste lote! Quantidade disponível: ${currentStock.quantity}`)
+        }
+
+        const newQty = currentStock.quantity - qty
+
+        // 2. Update stock item
+        const { error: updateErr } = await supabase
+          .from('stock')
+          .update({
+            quantity: newQty,
+            status: newQty <= 0 ? 'OUT_OF_STOCK' : 'AVAILABLE'
+          })
+          .eq('id', movementForm.selected_stock_id)
+        if (updateErr) throw updateErr
+
+        // 3. Create movement
+        const { error: movErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            stock_id: movementForm.selected_stock_id,
+            type: 'Saída',
+            quantity: qty,
+            reference: movementForm.reference || 'Saída Manual'
+          }])
+        if (movErr) throw movErr
+      }
+
+      toast.success('Movimentação manual de estoque registrada com sucesso!')
+      setIsMovementModalOpen(false)
+      setMovementForm({
+        product_id: '',
+        type: 'Entrada',
+        quantity: '10',
+        batch_number: '',
+        expiry_date: '',
+        reference: 'Ajuste de Inventário',
+        selected_stock_id: ''
+      })
+      loadStockData()
+    } catch (err: any) {
+      toast.error(`Erro ao salvar movimentação: ${err.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleOpenEditBatch = (item: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedBatchToEdit(item)
+    let formattedDate = ''
+    if (item.expiryDate || item.expiry_date) {
+      const d = new Date(item.expiryDate || item.expiry_date)
+      formattedDate = d.toISOString().split('T')[0]
+    }
+    setEditBatchForm({
+      batch_number: item.batchNumber || item.batch_number || '',
+      expiry_date: formattedDate
+    })
+    setIsEditBatchModalOpen(true)
+  }
+
+  const handleSaveBatchEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedBatchToEdit) return
+    if (!editBatchForm.batch_number || !editBatchForm.expiry_date) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('stock')
+        .update({
+          batch_number: editBatchForm.batch_number,
+          expiry_date: editBatchForm.expiry_date
+        })
+        .eq('id', selectedBatchToEdit.id)
+
+      if (error) throw error
+
+      toast.success('Informações do lote atualizadas com sucesso!')
+      setIsEditBatchModalOpen(false)
+      setSelectedBatchToEdit(null)
+      loadStockData()
+    } catch (err: any) {
+      toast.error(`Erro ao atualizar lote: ${err.message}`)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -297,7 +481,7 @@ export default function EstoquePage() {
         </div>
         <Button 
           className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
-          onClick={() => toast.info('Operação de movimentação de estoque deve ser gerada por compras ou vendas')}
+          onClick={() => setIsMovementModalOpen(true)}
         >
           <Plus className="mr-2 h-4 w-4" />
           Nova Movimentação
@@ -579,8 +763,16 @@ export default function EstoquePage() {
                                                 {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label}
                                               </span>
                                             </td>
-                                            <td className="py-2.5 px-3 text-center">
-                                              {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label === 'Vencido' ? (
+                                            <td className="py-2.5 px-3 text-center flex items-center justify-center gap-1.5">
+                                              <Button
+                                                variant="ghost"
+                                                onClick={(e) => handleOpenEditBatch(item, e)}
+                                                className="h-6 px-1.5 text-[9px] font-bold text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/80 rounded transition-all"
+                                                title="Editar informações do lote"
+                                              >
+                                                <Pencil className="h-3 w-3 text-muted-foreground" />
+                                              </Button>
+                                              {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label === 'Vencido' && (
                                                 <Button
                                                   variant="ghost"
                                                   onClick={(e) => handleReturnExpired(item, e)}
@@ -588,8 +780,6 @@ export default function EstoquePage() {
                                                 >
                                                   Devolver
                                                 </Button>
-                                              ) : (
-                                                <span className="text-muted-foreground text-[10px]">-</span>
                                               )}
                                             </td>
                                           </tr>
@@ -746,6 +936,202 @@ export default function EstoquePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Manual Movement Modal */}
+      {isMovementModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
+                Registrar Movimentação Manual
+              </h2>
+              <button 
+                onClick={() => setIsMovementModalOpen(false)} 
+                className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-secondary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveMovement} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Medicamento *</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                  value={movementForm.product_id}
+                  onChange={e => setMovementForm({...movementForm, product_id: e.target.value, selected_stock_id: ''})}
+                  required
+                >
+                  <option value="">Selecione o medicamento...</option>
+                  {products
+                    .filter((p: any) => p.status?.toLowerCase() !== 'inactive' && p.status?.toLowerCase() !== 'inativo')
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Tipo de Movimentação *</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                    value={movementForm.type}
+                    onChange={e => setMovementForm({...movementForm, type: e.target.value, selected_stock_id: ''})}
+                    required
+                  >
+                    <option value="Entrada">Entrada (Acrescentar)</option>
+                    <option value="Saída">Saída (Remover)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Quantidade *</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={movementForm.quantity}
+                    onChange={e => setMovementForm({...movementForm, quantity: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Conditional fields based on type */}
+              {movementForm.type === 'Entrada' ? (
+                <div className="space-y-4 p-4 bg-secondary/30 border border-border/40 rounded-lg animate-in fade-in duration-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Informações do Novo Lote</h3>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Número do Lote *</label>
+                    <Input
+                      placeholder="Ex: LOTE-12345"
+                      value={movementForm.batch_number}
+                      onChange={e => setMovementForm({...movementForm, batch_number: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Data de Vencimento *</label>
+                    <Input
+                      type="date"
+                      value={movementForm.expiry_date}
+                      onChange={e => setMovementForm({...movementForm, expiry_date: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 p-4 bg-secondary/30 border border-border/40 rounded-lg animate-in fade-in duration-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Selecionar Lote de Saída</h3>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Lote de Origem *</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                      value={movementForm.selected_stock_id}
+                      onChange={e => setMovementForm({...movementForm, selected_stock_id: e.target.value})}
+                      disabled={!movementForm.product_id}
+                      required
+                    >
+                      <option value="">Selecione o lote...</option>
+                      {movementForm.product_id && stockItems
+                        .filter(item => (item.productId || item.product_id) === movementForm.product_id && item.status !== 'OUT_OF_STOCK' && (item.quantity ?? 0) > 0)
+                        .map(item => (
+                          <option key={item.id} value={item.id}>
+                            Lote: {item.batch_number || item.batchNumber} (Disponível: {item.quantity} un.) - Venc: {item.expiry_date || item.expiryDate ? new Date(item.expiry_date || item.expiryDate).toLocaleDateString('pt-BR') : 'N/A'}
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Motivo / Referência *</label>
+                <Input
+                  placeholder="Ex: Ajuste de Inventário, Descarte por Avaria..."
+                  value={movementForm.reference}
+                  onChange={e => setMovementForm({...movementForm, reference: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <Button type="button" variant="outline" onClick={() => setIsMovementModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar Ajuste
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Batch Modal */}
+      {isEditBatchModalOpen && selectedBatchToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <CalendarCheck className="h-5 w-5 text-primary" />
+                Editar Lote &amp; Validade
+              </h2>
+              <button 
+                onClick={() => {
+                  setIsEditBatchModalOpen(false)
+                  setSelectedBatchToEdit(null)
+                }} 
+                className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-secondary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBatchEdit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Número do Lote *</label>
+                <Input
+                  value={editBatchForm.batch_number}
+                  onChange={e => setEditBatchForm({...editBatchForm, batch_number: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Data de Vencimento *</label>
+                <Input
+                  type="date"
+                  value={editBatchForm.expiry_date}
+                  onChange={e => setEditBatchForm({...editBatchForm, expiry_date: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsEditBatchModalOpen(false)
+                    setSelectedBatchToEdit(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar Alterações
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
