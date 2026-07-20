@@ -450,8 +450,20 @@ export default function Page() {
           </p>
         </div>
 
-        {/* Date Range Selector */}
-        <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-lg border border-border/40 self-start md:self-auto">
+        {/* Action Tools */}
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          {/* TV Mode Button */}
+          <a
+            href="/tv"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border/50 bg-card hover:bg-secondary/60 transition-all duration-300 hover:shadow-sm"
+          >
+            <span>📺 Modo TV</span>
+          </a>
+
+          {/* Date Range Selector */}
+          <div className="flex items-center gap-1 bg-secondary/30 p-1 rounded-lg border border-border/40">
           <button
             onClick={() => setFilterRange('thismonth')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
@@ -484,6 +496,7 @@ export default function Page() {
           </button>
         </div>
       </div>
+    </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
