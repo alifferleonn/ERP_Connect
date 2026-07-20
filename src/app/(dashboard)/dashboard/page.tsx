@@ -10,7 +10,12 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar
 } from 'recharts'
 import { 
   DollarSign, 
@@ -18,7 +23,9 @@ import {
   Boxes, 
   ClipboardList, 
   TrendingUp,
-  Package
+  Package,
+  PieChart as PieIcon,
+  BarChart3
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { useAuth } from '@/hooks/use-auth'
@@ -66,6 +73,8 @@ export default function Page() {
     suppliers: 0
   })
   const [salesHistory, setSalesHistory] = useState<any[]>([])
+  const [branchData, setBranchData] = useState<any[]>([])
+  const [topProductsData, setTopProductsData] = useState<any[]>([])
   const [filterRange, setFilterRange] = useState<'year' | '3months' | 'thismonth'>('year')
 
   useEffect(() => {
@@ -90,7 +99,7 @@ export default function Page() {
         ] = await Promise.all([
           supabase.from('products').select('*', { count: 'exact', head: true }),
           supabase.from('suppliers').select('*', { count: 'exact', head: true }),
-          supabase.from('sales').select('total_amount, created_at, customer_name'),
+          supabase.from('sales').select('total_amount, created_at, customer_name, product_id, products(name)'),
           purchasesQuery
         ])
 
@@ -246,6 +255,63 @@ export default function Page() {
           }
         }
 
+        // Calculate branch billing share (for Matrix) in USD
+        const branchBillingMap: Record<string, number> = {}
+        salesData?.forEach((s: any) => {
+          let branch = 'pharmix'
+          try {
+            const parsed = JSON.parse(s.customer_name)
+            if (parsed && parsed.branch) {
+              branch = parsed.branch
+            }
+          } catch {}
+
+          const amount = parseFloat(s.total_amount) || 0
+          // If it's a filial sale, convert BRL to USD by dividing by rate
+          const usdAmount = branch === 'pharmix' ? amount : amount / rate
+          branchBillingMap[branch] = (branchBillingMap[branch] || 0) + usdAmount
+        })
+
+        const branchColors: Record<string, string> = {
+          pharmix: '#6366f1',       // Indigo
+          trade: '#10b981',         // Emerald
+          connect: '#3b82f6',       // Blue
+          connecthealth: '#f59e0b',  // Amber
+        }
+
+        const branchLabels: Record<string, string> = {
+          pharmix: 'Matriz Pharmix',
+          trade: 'Filial Trade',
+          connect: 'Filial Connect',
+          connecthealth: 'Filial ConnectHealth',
+        }
+
+        const branchDataList = Object.entries(branchBillingMap).map(([branch, value]) => ({
+          name: branchLabels[branch] || branch.toUpperCase(),
+          value: parseFloat(value.toFixed(2)),
+          color: branchColors[branch] || '#64748b'
+        })).filter(item => item.value > 0)
+
+        setBranchData(branchDataList)
+
+        // Calculate top 5 selling products (for Filial) in local currency (BRL)
+        const productSalesMap: Record<string, number> = {}
+        filteredSales.forEach((s: any) => {
+          const prodName = s.products?.name || 'Medicamento'
+          const amount = parseFloat(s.total_amount) || 0
+          productSalesMap[prodName] = (productSalesMap[prodName] || 0) + amount
+        })
+
+        const productDataList = Object.entries(productSalesMap)
+          .map(([name, value]) => ({ 
+            name, 
+            value: parseFloat(value.toFixed(2)) 
+          }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5)
+
+        setTopProductsData(productDataList)
+
         // Only display chart if there is actual activity
         const hasActivity = history.some(h => h.vendas > 0 || h.compras > 0)
         setSalesHistory(hasActivity ? history : [])
@@ -298,6 +364,49 @@ export default function Page() {
       currency: 'USD'
     }).format(val)
   }
+
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-popover border border-border/80 px-3 py-2 rounded-lg shadow-xl backdrop-blur-md text-xs">
+          <p className="font-semibold text-foreground">{payload[0].name}</p>
+          <p className="font-bold text-primary mt-0.5">{formatCurrency(payload[0].value)}</p>
+        </div>
+      )
+    }
+    return null
+  }
+
+  const CustomAreaTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-popover border border-border/80 px-3 py-2 rounded-lg shadow-xl backdrop-blur-md text-xs space-y-1">
+          <p className="font-semibold text-muted-foreground">{label}</p>
+          {payload.map((item: any, idx: number) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.stroke || item.color }} />
+              <span className="text-foreground">{item.name}:</span>
+              <span className="font-bold text-foreground font-mono">{formatCurrency(item.value)}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
+
+  const CustomBarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-popover border border-border/80 px-3 py-2 rounded-lg shadow-xl backdrop-blur-md text-xs">
+          <p className="font-semibold text-foreground">{payload[0].name}</p>
+          <p className="font-bold text-primary mt-0.5">{formatCurrency(payload[0].value)}</p>
+        </div>
+      )
+    }
+    return null
+  }
+
 
   const metricsGrid = [
     {
@@ -402,57 +511,158 @@ export default function Page() {
       </div>
 
       {/* Charts Section */}
-      <Card className="border-border/50 bg-card/65 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            Vendas vs Compras ($ USD)
-          </CardTitle>
-          <CardDescription>Visualização mensal baseada em lançamentos reais do banco de dados</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {salesHistory.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-muted-foreground text-sm border border-dashed border-border/50 rounded-lg">
-              <Package className="h-8 w-8 mb-2 text-muted-foreground/60" />
-              Nenhum dado de venda ou compra registrado no Supabase para exibir no gráfico.
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={salesHistory}
-                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorPurchases" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      borderColor: 'hsl(var(--border))',
-                      color: 'hsl(var(--foreground))'
-                    }}
-                    formatter={(value: number) => [formatCurrency(value), undefined]}
-                  />
-                  <Legend />
-                  <Area type="monotone" name="Vendas ($)" dataKey="vendas" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorSales)" />
-                  <Area type="monotone" name="Compras ($)" dataKey="compras" stroke="#f59e0b" fillOpacity={1} fill="url(#colorPurchases)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Side: Sales vs Purchases (2/3 width) */}
+        <Card className="lg:col-span-2 border-border/50 bg-card/65 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Vendas vs Compras ({isFilial ? 'R$ BRL' : '$ USD'})
+            </CardTitle>
+            <CardDescription>Visualização mensal baseada em lançamentos reais do banco de dados</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {salesHistory.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground text-sm border border-dashed border-border/50 rounded-lg">
+                <Package className="h-8 w-8 mb-2 text-muted-foreground/60" />
+                Nenhum dado de venda ou compra registrado para exibir no gráfico.
+              </div>
+            ) : (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={salesHistory}
+                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPurchases" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                    <Tooltip content={<CustomAreaTooltip />} />
+                    <Legend />
+                    <Area type="monotone" name={isFilial ? "Vendas (R$)" : "Vendas ($)"} dataKey="vendas" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorSales)" />
+                    <Area type="monotone" name={isFilial ? "Compras (R$)" : "Compras ($)"} dataKey="compras" stroke="#f59e0b" fillOpacity={1} fill="url(#colorPurchases)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right Side: Conditional Chart (1/3 width) */}
+        {!isFilial ? (
+          /* Donut Chart: Sales share by branch for Matrix */
+          <Card className="border-border/50 bg-card/65 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <PieIcon className="h-5 w-5 text-primary" />
+                Faturamento por Filial ($)
+              </CardTitle>
+              <CardDescription>Participação consolidada no faturamento (USD)</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 flex flex-col items-center justify-between h-[280px]">
+              {branchData.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm text-center">
+                  <Package className="h-8 w-8 mb-2 text-muted-foreground/60" />
+                  Sem faturamento ativo nas filiais.
+                </div>
+              ) : (
+                <>
+                  <div className="h-44 w-full relative flex items-center justify-center">
+                    {/* Central Label for Total Consolidated Billing */}
+                    <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Total</span>
+                      <span className="text-sm font-extrabold text-foreground font-mono mt-0.5">
+                        {formatCurrency(branchData.reduce((acc, curr) => acc + curr.value, 0))}
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={branchData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {branchData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomPieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-full text-xs space-y-1.5 overflow-y-auto max-h-24 pt-2">
+                    {branchData.map((entry, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                          <span className="text-muted-foreground truncate max-w-[120px]">{entry.name}</span>
+                        </div>
+                        <span className="font-semibold font-mono">{formatCurrency(entry.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          /* Bar Chart: Top 5 Selling Products for Filial */
+          <Card className="border-border/50 bg-card/65 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Top 5 Produtos Vendidos
+              </CardTitle>
+              <CardDescription>Medicamentos com mais receita local (R$ BRL)</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 h-[280px]">
+              {topProductsData.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm text-center">
+                  <Package className="h-8 w-8 mb-2 text-muted-foreground/60" />
+                  Nenhuma venda de produto registrada.
+                </div>
+              ) : (
+                <div className="h-full w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={topProductsData}
+                      layout="vertical"
+                      margin={{ top: 5, right: 10, left: 10, bottom: 5 }}
+                    >
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10} 
+                        width={80}
+                        tickFormatter={(value) => value.length > 12 ? `${value.substring(0, 10)}...` : value}
+                      />
+                      <Tooltip content={<CustomBarTooltip />} />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }
+
