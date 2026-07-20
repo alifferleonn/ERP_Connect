@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { DollarSign, ShoppingCart, TrendingUp, ArrowLeft, RefreshCw, Trophy, Target } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 // Custom tooltip styling for TV
 const CustomTVTooltip = ({ active, payload, label }: any) => {
@@ -21,6 +24,20 @@ const CustomTVTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function TVDashboardPage() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.replace('/login')
+      } else if (user.isFilial) {
+        router.replace('/dashboard')
+        toast.error('Acesso negado: Filiais não possuem acesso ao monitor de TV.')
+      }
+    }
+  }, [user, loading, router])
+
   const [sales, setSales] = useState<any[]>([])
   const [dailyData, setDailyData] = useState<any[]>([])
   const [totalBilling, setTotalBilling] = useState(0)
@@ -113,6 +130,16 @@ export default function TVDashboardPage() {
   }, [])
 
   const goalPercentage = Math.min(100, Math.max(0, (totalBilling / (monthlyGoal || 1)) * 100))
+
+  if (loading || !user || user.isFilial) {
+    return (
+      <div className="min-h-screen bg-[#070A13] flex items-center justify-center">
+        <div className="text-muted-foreground text-sm font-semibold animate-pulse">
+          Carregando painel de monitoramento...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#070A13] text-foreground flex flex-col justify-between p-6 select-none overflow-hidden font-sans">
