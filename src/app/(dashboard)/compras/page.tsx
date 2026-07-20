@@ -47,6 +47,13 @@ export default function ComprasPage() {
   // Detail/Edit form state
   const [editStatus, setEditStatus] = useState('PENDENTE')
 
+  // Stock entry details state in creation form
+  const [createStockEntry, setCreateStockEntry] = useState({
+    batch_number: '',
+    expiry_date: '',
+    track_code: ''
+  })
+
   // Stock Entry form state (triggered when status becomes RECEBIDO)
   const [stockEntry, setStockEntry] = useState({
     batch_number: '',
@@ -154,6 +161,14 @@ export default function ComprasPage() {
       toast.error('Preencha os campos obrigatórios')
       return
     }
+
+    if (form.status === 'RECEBIDO') {
+      if (!createStockEntry.batch_number || !createStockEntry.expiry_date || !createStockEntry.track_code) {
+        toast.error('Preencha todas as informações do lote para dar entrada no estoque')
+        return
+      }
+    }
+
     setIsSaving(true)
     try {
       const supabase = createClient()
@@ -162,16 +177,48 @@ export default function ComprasPage() {
       const supplierId = isFilial ? getPharmixSupplierId(suppliers) : form.supplier_id
 
       const purchaseStatus = isFilial ? `${form.status}_${filialName}` : form.status
-      const { error } = await supabase.from('purchases').insert([{
-        supplier_id: supplierId,
-        product_id: form.product_id,
-        quantity: parseInt(form.quantity),
-        unit_price: parseFloat(form.unit_price),
-        total_amount: parseFloat(form.total_amount),
-        status: purchaseStatus,
-        created_at: new Date().toISOString()
-      }])
-      if (error) throw error
+      
+      // 1. Insert Purchase
+      const { error: purchaseErr } = await supabase
+        .from('purchases')
+        .insert([{
+          supplier_id: supplierId,
+          product_id: form.product_id,
+          quantity: parseInt(form.quantity),
+          unit_price: parseFloat(form.unit_price),
+          total_amount: parseFloat(form.total_amount),
+          status: purchaseStatus,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single()
+      if (purchaseErr) throw purchaseErr
+
+      // 2. If status is RECEBIDO, insert into stock and movements (similar to confirm receipt)
+      if (form.status === 'RECEBIDO') {
+        const { data: stockData, error: stockErr } = await supabase
+          .from('stock')
+          .insert([{
+            product_id: form.product_id,
+            quantity: parseInt(form.quantity),
+            batch_number: createStockEntry.batch_number,
+            expiry_date: createStockEntry.expiry_date,
+            status: 'AVAILABLE'
+          }])
+          .select()
+          .single()
+        if (stockErr) throw stockErr
+
+        const { error: movErr } = await supabase
+          .from('stock_movements')
+          .insert([{
+            stock_id: stockData.id,
+            type: 'Entrada',
+            quantity: parseInt(form.quantity),
+            reference: createStockEntry.track_code
+          }])
+        if (movErr) throw movErr
+      }
 
       // If the user is a filial, automatically generate the corresponding sale for Pharmix
       if (isFilial) {
@@ -195,6 +242,11 @@ export default function ComprasPage() {
         unit_price: '',
         total_amount: '',
         status: 'PENDENTE'
+      })
+      setCreateStockEntry({
+        batch_number: '',
+        expiry_date: '',
+        track_code: ''
       })
       loadPurchases()
     } catch (err: any) {
@@ -555,6 +607,41 @@ export default function ComprasPage() {
                   />
                 </div>
               </div>
+
+              {form.status === 'RECEBIDO' && (
+                <div className="space-y-4 p-4 bg-secondary/30 border border-border/40 rounded-lg animate-in fade-in duration-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Informações de Recebimento de Lote</h3>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Número do Lote *</label>
+                    <Input
+                      placeholder="Ex: LOTE-12345"
+                      value={createStockEntry.batch_number}
+                      onChange={e => setCreateStockEntry({...createStockEntry, batch_number: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Data de Vencimento *</label>
+                      <Input
+                        type="date"
+                        value={createStockEntry.expiry_date}
+                        onChange={e => setCreateStockEntry({...createStockEntry, expiry_date: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Código de Rastreio / Ref *</label>
+                      <Input
+                        placeholder="Ex: BR123456789XX"
+                        value={createStockEntry.track_code}
+                        onChange={e => setCreateStockEntry({...createStockEntry, track_code: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
