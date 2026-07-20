@@ -960,7 +960,7 @@ export default function VendasPage() {
                             ...prev,
                             customer_name: selected.company,
                             customer_email: selected.email || '',
-                            customer_cpf: selected.contact || '',
+                            customer_cpf: selected.cpf || '',
                           }))
                         }
                       }}
@@ -968,7 +968,7 @@ export default function VendasPage() {
                       <option value="">-- Escolha um cliente --</option>
                       {clients.map(c => (
                         <option key={c.id} value={c.id}>
-                          {c.company} {c.contact ? `(${c.contact})` : ''}
+                          {c.company} {c.cpf ? `(CPF: ${c.cpf})` : ''}
                         </option>
                       ))}
                     </select>

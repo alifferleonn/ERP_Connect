@@ -23,6 +23,7 @@ export default function ContatosPage() {
     phone: '',
     notes: '',
     country: 'Cliente',
+    cpf: '',
   })
 
   async function loadContacts() {
@@ -35,7 +36,7 @@ export default function ContatosPage() {
         .eq('country', 'Cliente')
 
       if (search) {
-        query = query.or(`company.ilike.%${search}%,contact.ilike.%${search}%,email.ilike.%${search}%`)
+        query = query.or(`company.ilike.%${search}%,contact.ilike.%${search}%,email.ilike.%${search}%,cpf.ilike.%${search}%`)
       }
 
       const { data, error } = await query.order('company', { ascending: true })
@@ -55,7 +56,7 @@ export default function ContatosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.company || !form.contact || !form.email || !form.phone) {
+    if (!form.company || !form.contact || !form.email || !form.phone || !form.cpf) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
@@ -73,6 +74,7 @@ export default function ContatosPage() {
             email: form.email,
             phone: form.phone,
             notes: form.notes,
+            cpf: form.cpf,
           })
           .eq('id', selectedContact.id)
         if (error) throw error
@@ -88,6 +90,7 @@ export default function ContatosPage() {
             phone: form.phone,
             notes: form.notes,
             country: 'Cliente',
+            cpf: form.cpf,
           }])
         if (error) throw error
         toast.success('Contato cadastrado com sucesso!')
@@ -102,6 +105,7 @@ export default function ContatosPage() {
         phone: '',
         notes: '',
         country: 'Cliente',
+        cpf: '',
       })
       loadContacts()
     } catch (err: any) {
@@ -110,6 +114,7 @@ export default function ContatosPage() {
       setIsSaving(false)
     }
   }
+
 
   const handleEdit = (contact: any) => {
     setSelectedContact(contact)
@@ -120,6 +125,7 @@ export default function ContatosPage() {
       phone: contact.phone || '',
       notes: contact.notes || '',
       country: 'Cliente',
+      cpf: contact.cpf || '',
     })
     setIsModalOpen(true)
   }
@@ -224,10 +230,18 @@ export default function ContatosPage() {
                 <tbody className="divide-y divide-border/20">
                   {contacts.map((contact) => (
                     <tr key={contact.id} className="hover:bg-secondary/60 transition-colors">
-                      <td className="py-3.5 px-6 font-semibold text-foreground">{contact.company}</td>
+                      <td className="py-3.5 px-6">
+                        <div className="font-semibold text-foreground">{contact.company}</div>
+                        {contact.cpf && (
+                          <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                            CPF: {contact.cpf}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3.5 px-6">{contact.contact}</td>
                       <td className="py-3.5 px-6 font-mono text-xs">{contact.email}</td>
                       <td className="py-3.5 px-6 font-mono text-xs">{contact.phone}</td>
+
                       <td className="py-3.5 px-6 text-muted-foreground max-w-xs truncate">{contact.notes || '-'}</td>
                       <td className="py-3.5 px-6 text-center">
                         <div className="flex items-center justify-center gap-2">
@@ -276,6 +290,16 @@ export default function ContatosPage() {
                   placeholder="Ex: Aliffer Azevedo"
                   value={form.contact}
                   onChange={e => setForm({...form, contact: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">CPF *</label>
+                <Input
+                  placeholder="000.000.000-00"
+                  value={form.cpf}
+                  onChange={e => setForm({...form, cpf: e.target.value})}
                   required
                 />
               </div>
