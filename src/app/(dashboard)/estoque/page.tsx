@@ -123,6 +123,44 @@ export default function EstoquePage() {
     loadStockData()
   }, [])
 
+  const handleReturnExpired = async (item: any, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent collapsing the product card
+    const confirm = window.confirm(`Deseja realmente registrar a devolução/descarte do lote vencido "${item.batchNumber || item.batch_number}"? Isso zerará o estoque deste lote.`)
+    if (!confirm) return
+
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+      
+      // 1. Update stock item quantity to 0 and status to OUT_OF_STOCK
+      const { error: updateErr } = await supabase
+        .from('stock')
+        .update({
+          quantity: 0,
+          status: 'OUT_OF_STOCK'
+        })
+        .eq('id', item.id)
+      if (updateErr) throw updateErr
+
+      // 2. Register stock movement of type 'Saída'
+      const { error: movErr } = await supabase
+        .from('stock_movements')
+        .insert([{
+          stock_id: item.id,
+          type: 'Saída',
+          quantity: item.quantity,
+          reference: 'DEVOLUÇÃO LOTE VENCIDO'
+        }])
+      if (movErr) throw movErr
+
+      toast.success(`Devolução do lote ${item.batchNumber || item.batch_number} registrada com sucesso!`)
+      loadStockData()
+    } catch (err: any) {
+      toast.error(`Erro ao registrar devolução: ${err.message}`)
+      setIsLoading(false)
+    }
+  }
+
   // Toggle expand/collapse for a product in catalog
   const toggleProduct = (id: string) => {
     setExpandedProducts(prev => ({
@@ -521,6 +559,7 @@ export default function EstoquePage() {
                                           <th className="py-2 px-3 text-right">Qtd</th>
                                           <th className="py-2 px-3">Vencimento</th>
                                           <th className="py-2 px-3 text-center">Status</th>
+                                          <th className="py-2 px-3 text-center">Ações</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-border/25">
@@ -539,6 +578,19 @@ export default function EstoquePage() {
                                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${getExpiryStatusInfo(item.expiryDate || item.expiry_date).badgeClass}`}>
                                                 {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label}
                                               </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center">
+                                              {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label === 'Vencido' ? (
+                                                <Button
+                                                  variant="ghost"
+                                                  onClick={(e) => handleReturnExpired(item, e)}
+                                                  className="h-6 px-2 text-[9px] font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 rounded transition-all"
+                                                >
+                                                  Devolver
+                                                </Button>
+                                              ) : (
+                                                <span className="text-muted-foreground text-[10px]">-</span>
+                                              )}
                                             </td>
                                           </tr>
                                         ))}
