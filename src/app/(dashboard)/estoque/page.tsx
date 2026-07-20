@@ -34,6 +34,7 @@ export default function EstoquePage() {
   }, [user, loading, router])
 
   const [search, setSearch] = useState('')
+  const [filterExpiryOnly, setFilterExpiryOnly] = useState(false)
 
   const [stockItems, setStockItems] = useState<any[]>([])
   const [movements, setMovements] = useState<any[]>([])
@@ -41,6 +42,39 @@ export default function EstoquePage() {
   const [products, setProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentTab, setCurrentTab] = useState<'disponivel' | 'entradas' | 'saidas' | 'para_entrar'>('disponivel')
+
+  const getExpiryStatusInfo = (expiryDateStr: string) => {
+    if (!expiryDateStr) return { label: 'Disponível', badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 dark:text-emerald-400' }
+    const expiry = new Date(expiryDateStr)
+    const now = new Date()
+    expiry.setHours(0, 0, 0, 0)
+    now.setHours(0, 0, 0, 0)
+    const diffTime = expiry.getTime() - now.getTime()
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (days <= 0) {
+      return { 
+        label: 'Vencido', 
+        badgeClass: 'bg-rose-500/10 text-rose-600 border-rose-500/25 dark:text-rose-400 font-bold' 
+      }
+    } else if (days <= 30) {
+      return { 
+        label: `Crítico (${days}d)`, 
+        badgeClass: 'bg-rose-500/10 text-rose-600 border-rose-500/25 dark:text-rose-400 font-semibold animate-pulse' 
+      }
+    } else if (days <= 90) {
+      return { 
+        label: `Alerta (${days}d)`, 
+        badgeClass: 'bg-amber-500/10 text-amber-600 border-amber-500/25 dark:text-amber-400 font-semibold' 
+      }
+    } else {
+      return { 
+        label: 'Seguro', 
+        badgeClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 dark:text-emerald-400' 
+      }
+    }
+  }
+
   
   // Catalog expansion & sorting states
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({})
@@ -132,6 +166,21 @@ export default function EstoquePage() {
         items
       }
     })
+    // Filter by expiration alert if active
+    .filter((prod: any) => {
+      if (!filterExpiryOnly) return true
+      return prod.items.some((item: any) => {
+        const expiryDateStr = item.expiryDate || item.expiry_date
+        if (!expiryDateStr) return false
+        const expiry = new Date(expiryDateStr)
+        const now = new Date()
+        expiry.setHours(0, 0, 0, 0)
+        now.setHours(0, 0, 0, 0)
+        const diffTime = expiry.getTime() - now.getTime()
+        const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        return days <= 90
+      })
+    })
     // Filter the catalog based on search
     .filter((prod: any) => {
       const matchesProduct = 
@@ -180,18 +229,7 @@ export default function EstoquePage() {
     (p.status || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'AVAILABLE':
-      case 'Disponível':
-        return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25 dark:text-emerald-400'
-      case 'CRITICAL':
-      case 'Crítico':
-        return 'bg-amber-500/10 text-amber-600 border-amber-500/25 dark:text-amber-400 animate-pulse'
-      default:
-        return 'bg-rose-500/10 text-rose-600 border-rose-500/25 dark:text-rose-400'
-    }
-  }
+
 
   if (loading || user?.isFilial) {
     return (
@@ -228,7 +266,7 @@ export default function EstoquePage() {
         </Button>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -243,6 +281,16 @@ export default function EstoquePage() {
             </button>
           )}
         </div>
+
+        {/* Expiry filter button */}
+        <Button
+          variant={filterExpiryOnly ? "default" : "outline"}
+          onClick={() => setFilterExpiryOnly(!filterExpiryOnly)}
+          className="sm:w-auto font-semibold flex items-center gap-1.5 transition-all duration-300"
+        >
+          <Calendar className="h-4 w-4" />
+          {filterExpiryOnly ? "Mostrando: Próximos do Vencimento" : "Filtrar: Próximos do Vencimento"}
+        </Button>
       </div>
 
       {/* Metrics Grid */}
@@ -397,7 +445,7 @@ export default function EstoquePage() {
                   <div className="p-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {groupedStockList.map((product: any) => {
-                        const isExpanded = !!expandedProducts[product.id]
+                        const isExpanded = !!expandedProducts[product.id] || filterExpiryOnly
                         const sortOrder = sortOrders[product.id] || 'near'
 
                         // Sort product items by expiry date based on local sort order
@@ -423,17 +471,19 @@ export default function EstoquePage() {
                                     {product.code}
                                   </span>
                                 </div>
-                                <div className="text-right flex flex-col items-end">
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                                    product.totalQuantity > 0 
-                                      ? 'bg-primary/10 text-primary border border-primary/20' 
-                                      : 'bg-muted text-muted-foreground border border-border'
-                                  }`}>
-                                    {product.totalQuantity} un.
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground mt-1">
-                                    {product.items.length} {product.items.length === 1 ? 'lote' : 'lotes'}
-                                  </span>
+                                <div>
+                                  <div className="text-right flex flex-col items-end">
+                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                                      product.totalQuantity > 0 
+                                        ? 'bg-primary/10 text-primary border border-primary/20' 
+                                        : 'bg-muted text-muted-foreground border border-border'
+                                    }`}>
+                                      {product.totalQuantity} un.
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">
+                                      {product.items.length} {product.items.length === 1 ? 'lote' : 'lotes'}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -486,8 +536,8 @@ export default function EstoquePage() {
                                               {item.expiryDate || item.expiry_date ? new Date(item.expiryDate || item.expiry_date).toLocaleDateString('pt-BR') : 'N/A'}
                                             </td>
                                             <td className="py-2.5 px-3 text-center">
-                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${getStatusBadge(item.status)}`}>
-                                                {item.status}
+                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${getExpiryStatusInfo(item.expiryDate || item.expiry_date).badgeClass}`}>
+                                                {getExpiryStatusInfo(item.expiryDate || item.expiry_date).label}
                                               </span>
                                             </td>
                                           </tr>

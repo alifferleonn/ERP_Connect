@@ -713,6 +713,13 @@ export default function VendasPage() {
         }])
       if (purchaseErr) throw purchaseErr
 
+      // Update matching Matrix sale status to 'COMPRA_SOLICITADA' to avoid duplicates
+      const { error: updateSaleErr } = await supabase
+        .from('sales')
+        .update({ status: 'COMPRA_SOLICITADA' })
+        .eq('id', selectedSale.id)
+      if (updateSaleErr) throw updateSaleErr
+
       toast.success(`Pedido de compra de ${needed} un. gerado como PENDENTE na Pharmix para o fornecedor.`);
       setIsShipmentModalOpen(false);
       loadSales();
@@ -1301,7 +1308,7 @@ export default function VendasPage() {
 
               {/* Actions Footer */}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                {!user?.isFilial && selectedSale.customer_name?.startsWith('Filial ') && selectedSale.status === 'PENDENTE' && (
+                {!user?.isFilial && selectedSale.customer_name?.startsWith('Filial ') && (selectedSale.status === 'PENDENTE' || selectedSale.status === 'COMPRA_SOLICITADA') && (
                   <Button 
                     onClick={() => handleOpenShipment(selectedSale)} 
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors"
@@ -1362,39 +1369,70 @@ export default function VendasPage() {
 
             {shipmentDeficit ? (
               <div className="p-6 space-y-4">
-                <div className="flex items-start gap-3 bg-rose-500/10 p-4 rounded-lg border border-rose-500/20 text-rose-600 dark:text-rose-400">
-                  <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                  <div className="space-y-1 text-sm">
-                    <span className="font-bold">Estoque insuficiente na Pharmix!</span>
+                {selectedSale.status === 'COMPRA_SOLICITADA' ? (
+                  <>
+                    <div className="flex items-start gap-3 bg-amber-500/10 p-4 rounded-lg border border-amber-500/20 text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1 text-sm">
+                        <span className="font-bold">Compra automática já solicitada!</span>
+                        <p className="text-xs text-muted-foreground">
+                          Uma ordem de compra para reabastecimento de {shipmentDeficit.needed} un. já foi gerada e está pendente de recebimento no sistema.
+                        </p>
+                      </div>
+                    </div>
+
                     <p className="text-xs text-muted-foreground">
-                      Você precisa de {selectedSale.quantity} unidades, mas tem apenas {shipmentDeficit.available} no estoque da matriz.
+                      Assim que o estoque for recebido na aba de Compras da Matriz, você poderá retornar aqui para inserir o código de rastreamento e realizar o despacho para a filial.
                     </p>
-                  </div>
-                </div>
 
-                <p className="text-xs text-muted-foreground">
-                  Para poder enviar este produto para a filial, você precisa primeiro comprá-lo do fornecedor genérico. Deseja gerar uma compra automática de <strong>{shipmentDeficit.needed} unidades</strong> na Pharmix?
-                </p>
+                    <div className="flex pt-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setIsShipmentModalOpen(false)}
+                        className="w-full"
+                      >
+                        Fechar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3 bg-rose-500/10 p-4 rounded-lg border border-rose-500/20 text-rose-600 dark:text-rose-400">
+                      <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1 text-sm">
+                        <span className="font-bold">Estoque insuficiente na Pharmix!</span>
+                        <p className="text-xs text-muted-foreground">
+                          Você precisa de {selectedSale.quantity} unidades, mas tem apenas {shipmentDeficit.available} no estoque da matriz.
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex gap-3 pt-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsShipmentModalOpen(false)}
-                    className="flex-1"
-                  >
-                    Voltar
-                  </Button>
-                  <Button 
-                    type="button" 
-                    onClick={handleGeneratePharmixPurchase} 
-                    className="flex-1 bg-primary text-primary-foreground font-bold"
-                    disabled={isSaving}
-                  >
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Gerar Compra Automática
-                  </Button>
-                </div>
+                    <p className="text-xs text-muted-foreground">
+                      Para poder enviar este produto para a filial, você precisa primeiro comprá-lo do fornecedor genérico. Deseja gerar uma compra automática de <strong>{shipmentDeficit.needed} unidades</strong> na Pharmix?
+                    </p>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setIsShipmentModalOpen(false)}
+                        className="flex-1"
+                      >
+                        Voltar
+                      </Button>
+                      <Button 
+                        type="button" 
+                        onClick={handleGeneratePharmixPurchase} 
+                        className="flex-1 bg-primary text-primary-foreground font-bold"
+                        disabled={isSaving}
+                      >
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Gerar Compra Automática
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <form onSubmit={handleExecuteShipment} className="p-6 space-y-4">
