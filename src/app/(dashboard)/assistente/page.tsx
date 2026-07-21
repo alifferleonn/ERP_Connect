@@ -7,13 +7,10 @@ import { Input } from '@/components/ui/input'
 import { 
   Sparkles, 
   Send, 
-  Settings, 
   Trash2, 
   Loader2, 
   Bot, 
-  User, 
-  RefreshCw,
-  Terminal
+  User
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
@@ -29,53 +26,16 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isConfigOpen, setIsConfigOpen] = useState(false)
-  
-  // AI Provider & Config
-  const [provider, setProvider] = useState<'gemini' | 'ollama'>('gemini')
-  const [geminiKey, setGeminiKey] = useState(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '')
-  const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash')
-  const [ollamaHost, setOllamaHost] = useState('http://127.0.0.1:11434')
-  const [ollamaModel, setOllamaModel] = useState('llama3')
 
   // ERP Context Data
   const [isContextLoading, setIsContextLoading] = useState(true)
   const [systemContext, setSystemContext] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Load configs on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedProvider = localStorage.getItem('ai_provider') as 'gemini' | 'ollama'
-      const savedGeminiKey = localStorage.getItem('gemini_key')
-      const savedGeminiModel = localStorage.getItem('gemini_model')
-      const savedOllamaHost = localStorage.getItem('ollama_host')
-      const savedOllamaModel = localStorage.getItem('ollama_model')
-      
-      if (savedProvider) setProvider(savedProvider)
-      if (savedGeminiKey) setGeminiKey(savedGeminiKey)
-      if (savedGeminiModel) setGeminiModel(savedGeminiModel)
-      if (savedOllamaHost) setOllamaHost(savedOllamaHost)
-      if (savedOllamaModel) setOllamaModel(savedOllamaModel)
-    }
-  }, [])
-
   // Auto-scroll chat window
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  const handleSaveConfigs = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ai_provider', provider)
-      localStorage.setItem('gemini_key', geminiKey)
-      localStorage.setItem('gemini_model', geminiModel)
-      localStorage.setItem('ollama_host', ollamaHost)
-      localStorage.setItem('ollama_model', ollamaModel)
-    }
-    toast.success('Configurações de IA salvas com sucesso!')
-    setIsConfigOpen(false)
-  }
 
   // Load database context for the AI Agent
   async function loadErpContext() {
@@ -152,7 +112,7 @@ ${JSON.stringify(activeProducts.slice(0, 10).map((p: any) => ({ nome: p.name, co
 Diretrizes da IA:
 1. Apresente-se como o Assistente de Inteligência do ERP.
 2. Responda em Português de forma profissional, direta e executiva.
-3. Use os dados acima para responder a perguntas de estoque, validades e faturamento.
+3. Use os dados acima para responder a perguntas de estoque (como "quantos produtos possuo em estoque"), validades e faturamento.
 4. Se o usuário perguntar como operar o sistema (ex: dar entrada, devolver vencido, despacho), explique de forma simples seguindo o manual de processos.`
 
       setSystemContext(erpStatusContext)
@@ -181,75 +141,30 @@ Diretrizes da IA:
     setIsLoading(true)
 
     try {
-      // Assemble full payload including system context if not already loaded in the conversation
+      // Assemble full payload including system context
       const conversationPayload: Message[] = [
         { role: 'system', content: systemContext },
         ...updatedMessages
       ]
-      let res;
-      if (provider === 'gemini') {
-        res = await fetch('/api/assistant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: conversationPayload,
-            provider: 'gemini',
-            apiKey: geminiKey,
-            modelName: geminiModel
-          })
+
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: conversationPayload
         })
-      } else {
-        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        if (isLocalhost) {
-          res = await fetch('/api/assistant', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messages: conversationPayload,
-              provider: 'ollama',
-              hostUrl: ollamaHost,
-              modelName: ollamaModel
-            })
-          })
-        } else {
-          res = await fetch(`${ollamaHost}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: ollamaModel,
-              messages: conversationPayload,
-              stream: false
-            })
-          })
-        }
-      }
+      })
 
       if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(errorText || 'Falha ao conectar com o modelo de IA.')
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Falha ao conectar com o modelo de IA.')
       }
 
       const data = await res.json()
-      const isOllamaDirect = provider === 'ollama' && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-      const assistantReply = isOllamaDirect ? (data.message?.content || 'Sem resposta.') : (data.message || 'Sem resposta.')
-      setMessages([...updatedMessages, { role: 'assistant', content: assistantReply }])
+      setMessages([...updatedMessages, { role: 'assistant', content: data.message }])
     } catch (err: any) {
       toast.error(err.message || 'Erro ao obter resposta do assistente.')
-      
-      let errorMsg = `❌ Erro de Conexão: Não consegui me comunicar com a IA.`
-      if (provider === 'gemini') {
-        errorMsg += `\n\nErro retornado pela API do Gemini. Certifique-se de que sua Chave de API está ativa e correta.`
-      } else {
-        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        errorMsg += ` em \`${ollamaHost}\` usando o modelo \`${ollamaModel}\`.`
-        if (!isLocalhost) {
-          errorMsg += `\n\n**Nota de Produção (Vercel)**:\nComo o ERP está rodando na nuvem, o seu navegador bloqueia a conexão local devido a restrições de CORS (segurança do navegador).\n\n**Como resolver isso de forma simples**:\n\n1. Feche o Ollama na barra de tarefas (caso esteja aberto).\n2. Abra o **Prompt de Comando (cmd)** do Windows e inicie o Ollama liberando o acesso (CORS) com o seguinte comando:\n   \`set OLLAMA_ORIGINS=*\`\n   \`ollama serve\`\n3. Deixe essa janela do cmd aberta e clique para enviar a pergunta novamente no ERP!`
-        } else {
-          errorMsg += `\n\nCertifique-se de que o Ollama está rodando localmente e que o modelo está instalado (\`ollama run ${ollamaModel}\`).`
-        }
-      }
-      
-      setMessages([...updatedMessages, { role: 'assistant', content: errorMsg }])
+      setMessages([...updatedMessages, { role: 'assistant', content: `❌ Erro de Conexão: ${err.message || 'Não foi possível obter resposta do servidor Gemini.'}` }])
     } finally {
       setIsLoading(false)
     }
@@ -278,109 +193,10 @@ Diretrizes da IA:
             Assistente IA de Operações
           </h1>
           <p className="text-muted-foreground text-sm">
-            Assistente de Inteligência Artificial local integrado aos dados de faturamento e estoque do Supabase.
+            Assistente de Inteligência Artificial integrado aos dados de faturamento e estoque do Supabase via Gemini API.
           </p>
         </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsConfigOpen(!isConfigOpen)}
-            className="border-border/60 hover:bg-secondary/40 font-semibold flex items-center gap-1.5"
-          >
-            <Settings className="h-4 w-4" />
-            Configurar Ollama
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadErpContext}
-            disabled={isContextLoading}
-            className="border-border/60 hover:bg-secondary/40 font-semibold"
-          >
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${isContextLoading ? 'animate-spin' : ''}`} />
-            Sincronizar Dados
-          </Button>
-        </div>
       </div>
-
-      {/* Collapsible Configurations Panel */}
-      {isConfigOpen && (
-        <Card className="border-indigo-500/25 bg-indigo-500/5 animate-in slide-in-from-top-2 duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-indigo-500" /> Parâmetros do Assistente de Inteligência Artificial
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Escolha entre usar a API da nuvem (Google Gemini) ou rodar um modelo de linguagem localmente em sua máquina (Ollama).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <div className="space-y-1.5 max-w-sm">
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Provedor de Inteligência Artificial</label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
-                value={provider}
-                onChange={e => setProvider(e.target.value as 'gemini' | 'ollama')}
-              >
-                <option value="gemini">Google Gemini (Nuvem - Rápido)</option>
-                <option value="ollama">Ollama (Local - Sem Custos)</option>
-              </select>
-            </div>
-
-            {provider === 'gemini' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Chave de API (Gemini API Key)</label>
-                  <Input
-                    type="password"
-                    value={geminiKey}
-                    onChange={e => setGeminiKey(e.target.value)}
-                    placeholder="Chave de API do Gemini"
-                    className="bg-card border-border/60 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Modelo do Gemini</label>
-                  <Input
-                    value={geminiModel}
-                    onChange={e => setGeminiModel(e.target.value)}
-                    placeholder="Ex: gemini-1.5-flash, gemini-1.5-pro"
-                    className="bg-card border-border/60 font-mono text-xs"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Endpoint / Host do Ollama</label>
-                  <Input
-                    value={ollamaHost}
-                    onChange={e => setOllamaHost(e.target.value)}
-                    placeholder="Ex: http://127.0.0.1:11434"
-                    className="bg-card border-border/60 font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Modelo do Ollama</label>
-                  <Input
-                    value={ollamaModel}
-                    onChange={e => setOllamaModel(e.target.value)}
-                    placeholder="Ex: llama3, mistral, gemma"
-                    className="bg-card border-border/60 font-mono text-xs"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleSaveConfigs} className="bg-indigo-600 hover:bg-indigo-700">Salvar Ajustes</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Main Chat Interface */}
       <Card className="border-border/50 overflow-hidden bg-card/65 backdrop-blur-sm shadow-xl flex flex-col h-[600px]">
@@ -390,7 +206,7 @@ Diretrizes da IA:
             <div>
               <CardTitle className="text-sm font-bold flex items-center gap-1.5">
                 <Bot className="h-4 w-4 text-emerald-500" />
-                Agente Conectado: {provider === 'gemini' ? geminiModel : ollamaModel} ({provider.toUpperCase()})
+                Agente Conectado: Gemini 1.5 Flash
               </CardTitle>
               <CardDescription className="text-[10px] uppercase font-mono mt-0.5">
                 Contexto ativo: {isContextLoading ? 'Sincronizando...' : 'Carregado de Supabase'}
@@ -420,7 +236,7 @@ Diretrizes da IA:
               <div className="space-y-2">
                 <h3 className="text-lg font-bold">O que você gostaria de auditar hoje?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Sou um agente local programado com as validades, estoque e vendas do ERP. Pergunte sobre medicamentos vencendo ou procedimentos operacionais!
+                  Sou um agente inteligente integrado ao ERP. Pergunte sobre produtos, validades, estoque ou procedimentos operacionais!
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 w-full pt-4">
