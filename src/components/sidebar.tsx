@@ -12,7 +12,6 @@ import {
   ShoppingCart,
   Users,
   X,
-  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -36,7 +35,6 @@ export function Sidebar() {
         { href: '/compras', label: 'Compras', icon: ShoppingCart },
         { href: '/contatos', label: 'Contatos de Clientes', icon: Users },
         { href: '/vendas', label: 'Vendas', icon: DollarSign },
-        { href: '/assistente', label: 'Assistente IA', icon: Sparkles },
       ]
     : [
         { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -45,7 +43,6 @@ export function Sidebar() {
         { href: '/fornecedores', label: 'Fornecedores', icon: Users },
         { href: '/estoque', label: 'Estoque', icon: Boxes },
         { href: '/vendas', label: 'Vendas', icon: DollarSign },
-        { href: '/assistente', label: 'Assistente IA', icon: Sparkles },
       ]
 
 
