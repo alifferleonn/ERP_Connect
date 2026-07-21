@@ -12,8 +12,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Google Gemini generateContent URL using the query parameter for key authentication
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`
+    // Use the stable v1 endpoint for gemini-1.5-flash
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`
 
     // Format chat history to Gemini's expected structure (role 'user' or 'model')
     const geminiContents = messages
