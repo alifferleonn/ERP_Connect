@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { 
-  DollarSign, 
-  ShoppingCart, 
-  TrendingUp, 
-  ArrowLeft, 
-  RefreshCw, 
-  Trophy, 
+import {
+  DollarSign,
+  ShoppingCart,
+  TrendingUp,
+  ArrowLeft,
+  RefreshCw,
+  Trophy,
   Target,
   Boxes,
   AlertTriangle,
@@ -118,7 +118,7 @@ export default function TVDashboardPage() {
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      
+
       const startOfToday = new Date()
       startOfToday.setHours(0, 0, 0, 0)
 
@@ -168,7 +168,7 @@ export default function TVDashboardPage() {
           if (parsed && parsed.branch) {
             branch = parsed.branch
           }
-        } catch {}
+        } catch { }
         const amount = parseFloat(s.total_amount) || 0
         branchBillingMap[branch] = (branchBillingMap[branch] || 0) + amount
       })
@@ -195,7 +195,7 @@ export default function TVDashboardPage() {
           color: branchColors[branch] || 'from-slate-500 to-slate-650'
         }))
         .sort((a, b) => b.value - a.value)
-      
+
       setBranchRanking(sortedRanks)
 
       // 2. Fetch stock data for Expiry/Inventory slide
@@ -219,8 +219,8 @@ export default function TVDashboardPage() {
 
         const expiry = new Date(expDate)
         const today = new Date()
-        expiry.setHours(0,0,0,0)
-        today.setHours(0,0,0,0)
+        expiry.setHours(0, 0, 0, 0)
+        today.setHours(0, 0, 0, 0)
         const diffTime = expiry.getTime() - today.getTime()
         const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
@@ -267,9 +267,9 @@ export default function TVDashboardPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Slide Rotation Timers (12 seconds per slide)
+  // Slide Rotation Timers (20 seconds per slide)
   useEffect(() => {
-    const slideDuration = 12000
+    const slideDuration = 20000
     const step = 100
     let elapsed = 0
 
@@ -303,10 +303,10 @@ export default function TVDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#070A13] text-foreground flex flex-col justify-between p-6 select-none overflow-hidden font-sans relative">
-      
+
       {/* Top Slide Transition Indicator */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-secondary/10 z-50">
-        <div 
+        <div
           className="h-full bg-gradient-to-r from-emerald-400 via-indigo-500 to-emerald-400 transition-all duration-100 ease-linear shadow-[0_0_10px_#10B981]"
           style={{ width: `${slideProgress}%` }}
         />
@@ -315,8 +315,8 @@ export default function TVDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/25 pb-4 mt-1">
         <div className="flex items-center gap-3">
-          <a 
-            href="/dashboard" 
+          <a
+            href="/dashboard"
             className="flex items-center justify-center p-2 rounded-lg bg-[#111625] border border-border/40 hover:bg-[#1a2136] transition-all duration-300 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -337,9 +337,9 @@ export default function TVDashboardPage() {
         <div className="flex items-center gap-6">
           <div className="text-right">
             <span className="text-[10px] text-muted-foreground uppercase font-bold block">Meta de Faturamento (BRL)</span>
-            <input 
-              type="number" 
-              value={monthlyGoal} 
+            <input
+              type="number"
+              value={monthlyGoal}
               onChange={e => handleGoalChange(e.target.value)}
               className="bg-transparent text-right font-mono font-extrabold text-indigo-400 text-lg border-b border-border/20 focus:border-indigo-500 outline-none w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
@@ -416,8 +416,8 @@ export default function TVDashboardPage() {
                   {goalPercentage.toFixed(1)}%
                 </div>
                 <div className="w-full bg-[#161D30] rounded-full h-3 mt-4 overflow-hidden border border-border/30">
-                  <div 
-                    className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-3 rounded-full transition-all duration-1000 shadow-glow" 
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-3 rounded-full transition-all duration-1000 shadow-glow"
                     style={{ width: `${goalPercentage}%` }}
                   />
                 </div>
@@ -425,8 +425,8 @@ export default function TVDashboardPage() {
               <div className="pt-4 border-t border-border/20 flex justify-between items-center text-xs font-mono">
                 <span className="text-muted-foreground">Falta para meta:</span>
                 <span className="font-bold text-foreground">
-                  {totalBilling >= monthlyGoal 
-                    ? 'Meta Batida! 🏆' 
+                  {totalBilling >= monthlyGoal
+                    ? 'Meta Batida! 🏆'
                     : formatBrl(monthlyGoal - totalBilling)
                   }
                 </span>
@@ -447,25 +447,25 @@ export default function TVDashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1A2235" />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="#475569" 
-                    fontSize={11} 
-                    tickLine={false} 
-                    axisLine={false} 
-                  />
-                  <YAxis 
-                    stroke="#475569" 
-                    fontSize={10} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="day"
+                    stroke="#475569"
+                    fontSize={11}
+                    tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `$${value}`} 
+                  />
+                  <YAxis
+                    stroke="#475569"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `$${value}`}
                   />
                   <Tooltip content={<CustomTVTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-                  <Bar 
-                    dataKey="vendas" 
-                    fill="url(#tvBarGrad)" 
-                    radius={[4, 4, 0, 0]} 
+                  <Bar
+                    dataKey="vendas"
+                    fill="url(#tvBarGrad)"
+                    radius={[4, 4, 0, 0]}
                   />
                   <defs>
                     <linearGradient id="tvBarGrad" x1="0" y1="0" x2="0" y2="1">
@@ -506,8 +506,8 @@ export default function TVDashboardPage() {
                         <span className="font-mono text-foreground font-bold">{formatBrl(rank.value)}</span>
                       </div>
                       <div className="w-full bg-[#161D30] rounded-full h-4 overflow-hidden border border-border/30 flex items-center">
-                        <div 
-                          className={`bg-gradient-to-r ${rank.color} h-3.5 rounded-full transition-all duration-1005`} 
+                        <div
+                          className={`bg-gradient-to-r ${rank.color} h-3.5 rounded-full transition-all duration-1005`}
                           style={{ width: `${widthPercent}%` }}
                         />
                       </div>
@@ -523,7 +523,7 @@ export default function TVDashboardPage() {
       {/* Slide 2: INVENTORY & VALIDADE MONITOR */}
       {activeSlide === 'inventory' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 my-4 flex-1 animate-in fade-in zoom-in-95 duration-500">
-          
+
           {/* Left Column: Stock Counters */}
           <div className="flex flex-col gap-6 lg:col-span-1">
             {/* Card 1: Total de Itens em Estoque */}
@@ -625,10 +625,10 @@ export default function TVDashboardPage() {
                       urgentLots.map((lot) => {
                         const isExpired = lot.daysRemaining <= 0
                         const isCritical = lot.daysRemaining > 0 && lot.daysRemaining <= 30
-                        
+
                         let tagClass = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         let text = `${lot.daysRemaining} dias`
-                        
+
                         if (isExpired) {
                           tagClass = 'bg-rose-500/15 text-rose-500 border-rose-500/30 animate-pulse font-extrabold'
                           text = 'EXPIRED 🔴'
@@ -678,11 +678,10 @@ export default function TVDashboardPage() {
             </div>
           ) : (
             sales.slice(0, 5).map((sale, i) => (
-              <div 
-                key={sale.id} 
-                className={`bg-[#121826]/70 border rounded-xl p-3 flex flex-col justify-between transition-all duration-500 animate-in fade-in slide-in-from-bottom-2 ${
-                  i === 0 ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.08)] bg-[#121d28]/70' : 'border-border/40'
-                }`}
+              <div
+                key={sale.id}
+                className={`bg-[#121826]/70 border rounded-xl p-3 flex flex-col justify-between transition-all duration-500 animate-in fade-in slide-in-from-bottom-2 ${i === 0 ? 'border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.08)] bg-[#121d28]/70' : 'border-border/40'
+                  }`}
               >
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                   <span className="truncate max-w-[80px] font-bold">{sale.customer_name || 'N/A'}</span>
