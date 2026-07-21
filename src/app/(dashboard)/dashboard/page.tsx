@@ -382,14 +382,32 @@ export default function Page() {
     loadData()
   }, [user, filterRange, initialCash])
 
-  // Load initial cash from localStorage on mount
+  // Load initial cash from Supabase or localStorage on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('dashboard_caixa_inicial')
-      if (stored) {
-        setInitialCash(parseFloat(stored))
+    async function fetchInitialCash() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'caixa_inicial')
+          .maybeSingle()
+        
+        if (!error && data) {
+          setInitialCash(parseFloat(data.value) || 50000)
+        } else {
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('dashboard_caixa_inicial')
+            if (stored) {
+              setInitialCash(parseFloat(stored))
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching initial cash from Supabase:', err)
       }
     }
+    fetchInitialCash()
   }, [])
 
   if (!mounted) return null
@@ -821,12 +839,32 @@ export default function Page() {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const parsed = parseFloat(tempCashInput) || 0
                     setInitialCash(parsed)
                     localStorage.setItem('dashboard_caixa_inicial', parsed.toString())
                     setIsCashModalOpen(false)
-                    toast.success('Caixa inicial atualizado com sucesso!')
+                    
+                    try {
+                      const supabase = createClient()
+                      const { error } = await supabase
+                        .from('settings')
+                        .upsert({ 
+                          id: 'cash-initial', 
+                          key: 'caixa_inicial', 
+                          value: parsed.toString() 
+                        })
+                      
+                      if (error) {
+                        console.warn('Erro ao salvar no Supabase:', error.message)
+                        toast.error('Salvo localmente. Execute o script SQL no console do Supabase para ativar a sincronização em nuvem!')
+                      } else {
+                        toast.success('Caixa inicial sincronizado no Supabase!')
+                      }
+                    } catch (err) {
+                      console.error('Erro de conexão:', err)
+                      toast.error('Salvo localmente. Erro ao conectar com o banco de dados.')
+                    }
                   }}
                   className="px-3 py-1.5 text-xs font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90"
                 >
