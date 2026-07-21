@@ -18,14 +18,18 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import pharmixLogo from '@/public/pharmix.png'
+import tradeLogo from '@/public/trade.webp'
+import connectLogo from '@/public/connect.png'
+import biossLogo from '@/public/bioss.png'
 
-// Custom high-contrast tooltip for TV
+// Custom high-contrast large tooltip for TV
 const CustomTVTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-black border-2 border-white p-2 rounded shadow-2xl">
-        <p className="text-[10px] font-bold text-zinc-400 uppercase">{`Dia ${label}`}</p>
-        <p className="text-sm font-black text-green-400 font-mono">
+      <div className="bg-black border-4 border-white p-3 rounded shadow-2xl">
+        <p className="text-sm font-black text-zinc-300 uppercase">{`Dia ${label}`}</p>
+        <p className="text-xl font-black text-green-400 font-mono">
           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(payload[0].value)}
         </p>
       </div>
@@ -174,7 +178,7 @@ export default function TVDashboardPage() {
       })
 
       const branchColors: Record<string, string> = {
-        pharmix: 'bg-indigo-600',
+        pharmix: 'bg-indigo-500',
         trade: 'bg-emerald-500',
         connect: 'bg-blue-500',
         connecthealth: 'bg-amber-500',
@@ -294,7 +298,7 @@ export default function TVDashboardPage() {
   if (loading || !user || user.isFilial) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-sm font-bold animate-pulse">
+        <div className="text-white text-lg font-black animate-pulse">
           Carregando painel de monitoramento...
         </div>
       </div>
@@ -302,48 +306,55 @@ export default function TVDashboardPage() {
   }
 
   return (
-    <div className="h-screen max-h-screen bg-black text-white flex flex-col justify-between p-4 select-none overflow-hidden font-sans relative">
+    <div className="h-screen max-h-screen bg-black text-white flex flex-col justify-between p-6 select-none overflow-hidden font-sans relative">
       
-      {/* Top Slide Transition Indicator */}
-      <div className="absolute top-0 left-0 right-0 h-1.5 bg-zinc-950 z-50">
+      {/* Top Slide Transition Indicator - Thicker for TV visibility */}
+      <div className="absolute top-0 left-0 right-0 h-3 bg-zinc-950 z-50">
         <div 
-          className="h-full bg-emerald-500 transition-all duration-100 ease-linear shadow-[0_0_12px_#10B981]"
+          className="h-full bg-emerald-400 transition-all duration-100 ease-linear shadow-[0_0_20px_#10B981]"
           style={{ width: `${slideProgress}%` }}
         />
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-2.5 mt-1">
-        <div className="flex items-center gap-3">
+      {/* Header - Bigger text, higher contrast */}
+      <div className="flex items-center justify-between border-b-4 border-zinc-800 pb-4 mt-2">
+        <div className="flex items-center gap-4">
           <a 
             href="/dashboard" 
-            className="flex items-center justify-center p-2 rounded bg-zinc-900 border border-zinc-700 hover:bg-zinc-850 text-white"
+            className="flex items-center justify-center p-3 rounded bg-zinc-900 border-2 border-zinc-700 hover:bg-zinc-800 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-6 w-6" />
           </a>
           <div>
-            <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-              <span>Painel de Monitoramento</span>
-              <span className="text-xs bg-white text-black font-extrabold px-2 py-0.5 rounded tracking-widest font-mono">
-                {activeSlide === 'sales' ? 'VENDAS' : 'ESTOQUE & VALIDADE'}
+            <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
+              <span>MONITOR CORPORATIVO</span>
+              <span className="text-sm bg-white text-black font-extrabold px-3 py-1 rounded tracking-widest font-mono">
+                {activeSlide === 'sales' ? 'VENDAS & METAS' : 'ESTOQUE & VALIDADE'}
               </span>
             </h1>
           </div>
         </div>
+        {/* Group Logos */}
+        <div className="hidden lg:flex items-center gap-6 bg-white px-5 py-2 rounded border-2 border-zinc-800">
+          <img src={pharmixLogo.src} alt="Pharmix" className="h-8 object-contain" />
+          <img src={tradeLogo.src} alt="Trade" className="h-8 object-contain" />
+          <img src={connectLogo.src} alt="Connect" className="h-8 object-contain" />
+          <img src={biossLogo.src} alt="Bioss" className="h-8 object-contain" />
+        </div>
 
         <div className="flex items-center gap-6">
           <div className="text-right">
-            <span className="text-[10px] text-zinc-400 uppercase font-black block tracking-wider">META DO MÊS (R$)</span>
+            <span className="text-xs text-zinc-300 uppercase font-black block tracking-widest">META DO MÊS</span>
             <input 
               type="number" 
               value={monthlyGoal} 
               onChange={e => handleGoalChange(e.target.value)}
-              className="bg-transparent text-right font-mono font-black text-white text-base border-b border-zinc-700 focus:border-white outline-none w-28 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="bg-transparent text-right font-mono font-black text-indigo-400 text-2xl border-b-2 border-zinc-700 focus:border-white outline-none w-40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded border border-zinc-800 text-[10px] font-mono font-bold text-zinc-300">
-            <RefreshCw className={`h-3 w-3 text-emerald-500 ${isLoading ? 'animate-spin' : ''}`} />
+          <div className="flex items-center gap-3 bg-zinc-900 px-4 py-2.5 rounded border-2 border-zinc-800 text-xs font-mono font-black text-white">
+            <RefreshCw className={`h-4 w-4 text-emerald-400 ${isLoading ? 'animate-spin' : ''}`} />
             <span>ATUALIZADO: {lastUpdated.toLocaleTimeString('pt-BR')}</span>
           </div>
         </div>
@@ -351,62 +362,62 @@ export default function TVDashboardPage() {
 
       {/* Slide 1: COMMERCIAL OVERVIEW */}
       {activeSlide === 'sales' && (
-        <div className="grid grid-cols-3 gap-4 my-3 flex-1 overflow-hidden h-[calc(100vh-210px)]">
+        <div className="grid grid-cols-3 gap-6 my-4 flex-1 overflow-hidden h-[calc(100vh-250px)]">
           {/* Left Column: Commercial Key Metrics */}
-          <div className="col-span-1 flex flex-col gap-3 h-full">
+          <div className="col-span-1 flex flex-col gap-4 h-full">
             {/* Card 1: Faturamento Mês */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <DollarSign className="h-4 w-4 text-emerald-400" /> FATURAMENTO MENSAL
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-emerald-400" /> FATURAMENTO MENSAL
                 </span>
-                <div className="text-3xl xl:text-4xl font-black font-mono text-emerald-400 mt-2 tracking-tight">
+                <div className="text-4xl xl:text-5xl font-black font-mono text-emerald-400 mt-3 tracking-tight">
                   {formatBrl(totalBilling)}
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Pedidos no mês:</span>
-                <span className="font-extrabold text-white text-xs">{salesCount} vendas</span>
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Pedidos no mês:</span>
+                <span className="font-black text-white text-base">{salesCount} vendas</span>
               </div>
             </div>
 
-            {/* Card 2: Faturamento Hoje */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            {/* Card 2: Faturamento de Hoje */}
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4 text-emerald-400" /> FATURAMENTO HOJE
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-400" /> FATURAMENTO DE HOJE
                 </span>
-                <div className="text-3xl xl:text-4xl font-black font-mono text-cyan-400 mt-2 tracking-tight">
+                <div className="text-4xl xl:text-5xl font-black font-mono text-cyan-400 mt-3 tracking-tight">
                   {formatBrl(todayBilling)}
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Status do Dia:</span>
-                <span className={`font-bold text-xs uppercase px-2 py-0.5 rounded ${todayBilling > 0 ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-800 text-zinc-400'}`}>
-                  {todayBilling > 0 ? 'CONCLUÍDO' : 'SEM MOVIMENTAÇÃO'}
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Status do Dia:</span>
+                <span className={`font-black text-sm uppercase px-3 py-1 rounded ${todayBilling > 0 ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-800 text-zinc-300'}`}>
+                  {todayBilling > 0 ? 'FATURADO' : 'SEM VENDAS'}
                 </span>
               </div>
             </div>
 
             {/* Card 3: Meta e Progresso */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <Target className="h-4 w-4 text-indigo-400" /> PROGRESSO DA META
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <Target className="h-5 w-5 text-indigo-400" /> PROGRESSO DA META
                 </span>
-                <div className="text-3xl xl:text-4xl font-black font-mono text-indigo-400 mt-2 tracking-tight">
+                <div className="text-4xl xl:text-5xl font-black font-mono text-indigo-400 mt-3 tracking-tight">
                   {goalPercentage.toFixed(1)}%
                 </div>
-                <div className="w-full bg-zinc-900 rounded h-3 mt-3 overflow-hidden border border-zinc-800">
+                <div className="w-full bg-zinc-900 rounded-full h-5 mt-4 overflow-hidden border-2 border-zinc-800">
                   <div 
                     className="bg-indigo-500 h-full rounded transition-all duration-1000" 
                     style={{ width: `${goalPercentage}%` }}
                   />
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Pendente para atingir:</span>
-                <span className="font-extrabold text-white text-xs">
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Pendente para atingir:</span>
+                <span className="font-black text-white text-base">
                   {totalBilling >= monthlyGoal 
                     ? 'META CONCLUÍDA! 🏆' 
                     : formatBrl(monthlyGoal - totalBilling)
@@ -417,27 +428,29 @@ export default function TVDashboardPage() {
           </div>
 
           {/* Center Column: Evolution Chart */}
-          <div className="col-span-1 bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between h-full">
+          <div className="col-span-1 bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between h-full">
             <div>
-              <h3 className="text-xs font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
-                <TrendingUp className="h-4 w-4 text-emerald-400" /> EVOLUÇÃO DE VENDAS DIÁRIAS
+              <h3 className="text-sm font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
+                <TrendingUp className="h-5 w-5 text-emerald-400" /> EVOLUÇÃO DE VENDAS DIÁRIAS
               </h3>
             </div>
 
             <div className="flex-1 min-h-[220px] w-full pt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                   <XAxis 
                     dataKey="day" 
-                    stroke="#a1a1aa" 
-                    fontSize={10} 
+                    stroke="#ffffff" 
+                    fontSize={11} 
+                    fontWeight="bold"
                     tickLine={false} 
                     axisLine={false} 
                   />
                   <YAxis 
-                    stroke="#a1a1aa" 
-                    fontSize={9} 
+                    stroke="#ffffff" 
+                    fontSize={10} 
+                    fontWeight="bold"
                     tickLine={false} 
                     axisLine={false}
                     tickFormatter={(value) => `$${value}`} 
@@ -454,14 +467,14 @@ export default function TVDashboardPage() {
           </div>
 
           {/* Right Column: Branch Leaderboard */}
-          <div className="col-span-1 bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between h-full">
+          <div className="col-span-1 bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between h-full">
             <div>
-              <h3 className="text-xs font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
-                <Trophy className="h-4 w-4 text-indigo-400" /> FATURAMENTO POR UNIDADE
+              <h3 className="text-sm font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
+                <Trophy className="h-5 w-5 text-indigo-400" /> FATURAMENTO POR FILIAL
               </h3>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center gap-3">
+            <div className="flex-1 flex flex-col justify-center gap-5">
               {branchRanking.length === 0 ? (
                 <div className="text-center text-xs text-zinc-500">Sem faturamento registrado.</div>
               ) : (
@@ -471,15 +484,15 @@ export default function TVDashboardPage() {
                   const medals = ['🥇', '🥈', '🥉', '4️⃣']
 
                   return (
-                    <div key={rank.branch} className="space-y-1">
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="flex items-center gap-1.5">
-                          <span className="w-5 text-center font-bold text-xs">{medals[index] || `#${index + 1}`}</span>
-                          <span className="text-white">{rank.label}</span>
+                    <div key={rank.branch} className="space-y-2">
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <span className="flex items-center gap-2">
+                          <span className="w-6 text-center font-extrabold text-sm">{medals[index] || `#${index + 1}`}</span>
+                          <span className="text-white text-base">{rank.label}</span>
                         </span>
-                        <span className="font-mono text-emerald-400 font-extrabold">{formatBrl(rank.value)}</span>
+                        <span className="font-mono text-emerald-400 font-black text-base">{formatBrl(rank.value)}</span>
                       </div>
-                      <div className="w-full bg-zinc-900 rounded h-3 overflow-hidden border border-zinc-800">
+                      <div className="w-full bg-zinc-900 rounded h-5 overflow-hidden border-2 border-zinc-850">
                         <div 
                           className={`${rank.color} h-full rounded transition-all duration-1000`} 
                           style={{ width: `${widthPercent}%` }}
@@ -496,84 +509,84 @@ export default function TVDashboardPage() {
 
       {/* Slide 2: INVENTORY & VALIDADE MONITOR */}
       {activeSlide === 'inventory' && (
-        <div className="grid grid-cols-3 gap-4 my-3 flex-1 overflow-hidden h-[calc(100vh-210px)]">
+        <div className="grid grid-cols-3 gap-6 my-4 flex-1 overflow-hidden h-[calc(100vh-250px)]">
           
           {/* Left Column: Stock Counters */}
-          <div className="col-span-1 flex flex-col gap-3 h-full">
+          <div className="col-span-1 flex flex-col gap-4 h-full">
             {/* Card 1: Total em Estoque */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <Boxes className="h-4 w-4 text-indigo-400" /> TOTAL EM ESTOQUE
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <Boxes className="h-5 w-5 text-indigo-400" /> TOTAL EM ESTOQUE
                 </span>
-                <div className="text-3xl xl:text-4xl font-black font-mono text-white mt-2 tracking-tight">
+                <div className="text-4xl xl:text-5xl font-black font-mono text-white mt-3 tracking-tight">
                   {stockMetrics.totalItems.toLocaleString('pt-BR')}
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Controle Físico:</span>
-                <span className="font-bold text-emerald-400 uppercase text-xs">ATUALIZADO</span>
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Controle Físico:</span>
+                <span className="font-black text-emerald-400 uppercase text-sm">ATIVADO</span>
               </div>
             </div>
 
             {/* Card 2: Lotes Vencidos */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 text-rose-500" /> LOTES VENCIDOS (EXPIRADOS)
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-rose-500" /> LOTES VENCIDOS (EXPIRADOS)
                 </span>
-                <div className={`text-3xl xl:text-4xl font-black font-mono mt-2 tracking-tight ${stockMetrics.expiredLotsCount > 0 ? 'text-red-500' : 'text-zinc-500'}`}>
+                <div className={`text-4xl xl:text-5xl font-black font-mono mt-3 tracking-tight ${stockMetrics.expiredLotsCount > 0 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
                   {stockMetrics.expiredLotsCount}
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Ação Recomendada:</span>
-                <span className={`font-bold text-xs uppercase ${stockMetrics.expiredLotsCount > 0 ? 'text-red-500' : 'text-zinc-500'}`}>
-                  {stockMetrics.expiredLotsCount > 0 ? 'BAIXAR NO ESTOQUE' : 'NENHUM VENCIDO'}
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Ação Recomendada:</span>
+                <span className={`font-black text-sm uppercase ${stockMetrics.expiredLotsCount > 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                  {stockMetrics.expiredLotsCount > 0 ? 'RECOLHER AGORA' : 'NENHUM VENCIDO'}
                 </span>
               </div>
             </div>
 
             {/* Card 3: Lotes Próximos do Vencimento */}
-            <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between flex-1">
+            <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between flex-1">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-400 tracking-widest flex items-center gap-1.5">
-                  <Target className="h-4 w-4 text-amber-550" /> LOTES PRÓXIMOS A VENCER (90D)
+                <span className="text-xs uppercase font-black text-zinc-300 tracking-widest flex items-center gap-2">
+                  <Target className="h-5 w-5 text-amber-500" /> LOTES A VENCER (90 DIAS)
                 </span>
-                <div className={`text-3xl xl:text-4xl font-black font-mono mt-2 tracking-tight ${stockMetrics.warningLotsCount > 0 ? 'text-amber-500 font-black' : 'text-zinc-500'}`}>
+                <div className={`text-4xl xl:text-5xl font-black font-mono mt-3 tracking-tight ${stockMetrics.warningLotsCount > 0 ? 'text-amber-500 font-black' : 'text-zinc-500'}`}>
                   {stockMetrics.warningLotsCount}
                 </div>
               </div>
-              <div className="pt-2 border-t border-zinc-900 flex justify-between items-center text-[10px] font-mono">
-                <span className="text-zinc-400 font-bold">Status do Período:</span>
-                <span className="font-bold text-amber-500 uppercase text-xs">SOB MONITORIA</span>
+              <div className="pt-3 border-t border-zinc-900 flex justify-between items-center text-xs font-mono">
+                <span className="text-zinc-300 font-extrabold">Status de Validade:</span>
+                <span className="font-black text-amber-400 uppercase text-sm">MONITORADO</span>
               </div>
             </div>
           </div>
 
           {/* Center & Right Column: Urgent Lots Expiry Table */}
-          <div className="col-span-2 bg-zinc-950 border-2 border-zinc-800 rounded-xl p-4 flex flex-col justify-between h-full">
+          <div className="col-span-2 bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-5 flex flex-col justify-between h-full">
             <div>
-              <h3 className="text-xs font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
-                <AlertTriangle className="h-4 w-4 text-red-500" /> LOTES DE MEDICAMENTOS MAIS CRÍTICOS
+              <h3 className="text-sm font-black tracking-widest text-zinc-300 flex items-center gap-2 uppercase">
+                <AlertTriangle className="h-5 w-5 text-red-500" /> LOTES DE MEDICAMENTOS MAIS CRÍTICOS
               </h3>
             </div>
 
             <div className="flex-1 mt-4 overflow-hidden">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-sm font-mono">
                 <thead>
-                  <tr className="border-b-2 border-zinc-800 pb-2 text-[10px] text-zinc-400 uppercase tracking-widest font-black">
-                    <th className="py-2">Medicamento</th>
-                    <th className="py-2">Lote</th>
-                    <th className="py-2 text-center">Unidades</th>
-                    <th className="py-2 text-center">Data Validade</th>
-                    <th className="py-2 text-right">Validade Restante</th>
+                  <tr className="border-b-4 border-zinc-800 pb-3 text-xs text-zinc-300 uppercase tracking-widest font-black">
+                    <th className="py-2.5">Medicamento</th>
+                    <th className="py-2.5">Lote</th>
+                    <th className="py-2.5 text-center">Quantidade</th>
+                    <th className="py-2.5 text-center">Data Validade</th>
+                    <th className="py-2.5 text-right">Validade Restante</th>
                   </tr>
                 </thead>
                 <tbody>
                   {urgentLots.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-zinc-500 font-bold">Nenhum lote crítico no momento. 🟢</td>
+                      <td colSpan={5} className="py-12 text-center text-zinc-400 text-lg font-black">Nenhum lote crítico no momento. 🟢</td>
                     </tr>
                   ) : (
                     urgentLots.map((lot) => {
@@ -595,15 +608,15 @@ export default function TVDashboardPage() {
                       }
 
                       return (
-                        <tr key={lot.id} className="border-b border-zinc-900 hover:bg-zinc-900/50">
-                          <td className="py-2.5 font-sans font-black text-white text-sm truncate max-w-[200px]" title={lot.productName}>
+                        <tr key={lot.id} className="border-b-2 border-zinc-900 hover:bg-zinc-900/50">
+                          <td className="py-3 font-sans font-black text-white text-base truncate max-w-[220px]" title={lot.productName}>
                             {lot.productName}
                           </td>
-                          <td className="py-2.5 font-mono font-bold text-zinc-300">{lot.batchNumber}</td>
-                          <td className="py-2.5 text-center text-white font-extrabold">{lot.quantity}</td>
-                          <td className="py-2.5 text-center text-zinc-400 font-bold">{new Date(lot.expiryDate).toLocaleDateString('pt-BR')}</td>
-                          <td className="py-2.5 text-right">
-                            <span className={`px-2 py-0.5 rounded border text-[10px] uppercase ${tagClass}`}>
+                          <td className="py-3 font-mono font-bold text-zinc-300 text-base">{lot.batchNumber}</td>
+                          <td className="py-3 text-center text-white font-extrabold text-base">{lot.quantity}</td>
+                          <td className="py-3 text-center text-zinc-350 font-bold text-base">{new Date(lot.expiryDate).toLocaleDateString('pt-BR')}</td>
+                          <td className="py-3 text-right">
+                            <span className={`px-3 py-1 rounded border-2 text-xs uppercase ${tagClass}`}>
                               {text}
                             </span>
                           </td>
@@ -619,34 +632,34 @@ export default function TVDashboardPage() {
       )}
 
       {/* Footer: Feed de Últimas Vendas */}
-      <div className="bg-zinc-950 border-2 border-zinc-800 rounded-xl p-3.5 mt-1">
-        <h4 className="text-[10px] uppercase font-black text-zinc-400 tracking-widest mb-2 flex items-center gap-1.5">
-          <ShoppingCart className="h-4 w-4 text-emerald-400" /> ÚLTIMAS VENDAS EM TEMPO REAL
+      <div className="bg-zinc-950 border-4 border-zinc-800 rounded-2xl p-4 mt-2">
+        <h4 className="text-xs uppercase font-black text-zinc-300 tracking-widest mb-3 flex items-center gap-2">
+          <ShoppingCart className="h-5 w-5 text-emerald-400" /> ÚLTIMAS VENDAS EM TEMPO REAL
         </h4>
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-5 gap-4">
           {sales.length === 0 ? (
-            <div className="col-span-5 text-center text-xs text-zinc-500 py-1">
+            <div className="col-span-5 text-center text-sm text-zinc-500 py-2">
               Nenhuma venda registrada.
             </div>
           ) : (
             sales.slice(0, 5).map((sale, i) => (
               <div 
                 key={sale.id} 
-                className={`bg-black border rounded p-2.5 flex flex-col justify-between ${
-                  i === 0 ? 'border-emerald-400 border-2 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : 'border-zinc-800'
+                className={`bg-black border rounded-xl p-3 flex flex-col justify-between ${
+                  i === 0 ? 'border-emerald-400 border-4 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'border-zinc-800 border-2'
                 }`}
               >
-                <div className="flex items-center justify-between text-[9px] text-zinc-400 font-bold uppercase">
-                  <span className="truncate max-w-[85px]">{sale.customer_name || 'N/A'}</span>
+                <div className="flex items-center justify-between text-[10px] text-zinc-300 font-black uppercase">
+                  <span className="truncate max-w-[90px]">{sale.customer_name || 'N/A'}</span>
                   <span>{new Date(sale.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <div className="mt-1 text-xs font-black text-white truncate" title={sale.products?.name}>
+                <div className="mt-1.5 text-sm font-black text-white truncate" title={sale.products?.name}>
                   {sale.products?.name || 'Medicamento'}
                 </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="text-[9px] text-zinc-400 font-mono">{sale.quantity} un.</span>
-                  <span className="text-xs font-black text-emerald-400 font-mono">
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-zinc-300 font-mono font-bold">{sale.quantity} un.</span>
+                  <span className="text-sm font-black text-emerald-400 font-mono">
                     {formatBrl(sale.total_amount || 0)}
                   </span>
                 </div>
