@@ -31,7 +31,10 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
   
-  // Ollama Config
+  // AI Provider & Config
+  const [provider, setProvider] = useState<'gemini' | 'ollama'>('gemini')
+  const [geminiKey, setGeminiKey] = useState(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '')
+  const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash')
   const [ollamaHost, setOllamaHost] = useState('http://127.0.0.1:11434')
   const [ollamaModel, setOllamaModel] = useState('llama3')
 
@@ -43,10 +46,17 @@ export default function AssistantPage() {
   // Load configs on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedHost = localStorage.getItem('ollama_host')
-      const savedModel = localStorage.getItem('ollama_model')
-      if (savedHost) setOllamaHost(savedHost)
-      if (savedModel) setOllamaModel(savedModel)
+      const savedProvider = localStorage.getItem('ai_provider') as 'gemini' | 'ollama'
+      const savedGeminiKey = localStorage.getItem('gemini_key')
+      const savedGeminiModel = localStorage.getItem('gemini_model')
+      const savedOllamaHost = localStorage.getItem('ollama_host')
+      const savedOllamaModel = localStorage.getItem('ollama_model')
+      
+      if (savedProvider) setProvider(savedProvider)
+      if (savedGeminiKey) setGeminiKey(savedGeminiKey)
+      if (savedGeminiModel) setGeminiModel(savedGeminiModel)
+      if (savedOllamaHost) setOllamaHost(savedOllamaHost)
+      if (savedOllamaModel) setOllamaModel(savedOllamaModel)
     }
   }, [])
 
@@ -57,10 +67,13 @@ export default function AssistantPage() {
 
   const handleSaveConfigs = () => {
     if (typeof window !== 'undefined') {
+      localStorage.setItem('ai_provider', provider)
+      localStorage.setItem('gemini_key', geminiKey)
+      localStorage.setItem('gemini_model', geminiModel)
       localStorage.setItem('ollama_host', ollamaHost)
       localStorage.setItem('ollama_model', ollamaModel)
     }
-    toast.success('Configurações do Ollama salvas com sucesso!')
+    toast.success('Configurações de IA salvas com sucesso!')
     setIsConfigOpen(false)
   }
 
@@ -173,52 +186,67 @@ Diretrizes da IA:
         { role: 'system', content: systemContext },
         ...updatedMessages
       ]
-
-      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      
       let res;
-      if (isLocalhost) {
-        // Local dev: call backend proxy to avoid CORS
+      if (provider === 'gemini') {
         res = await fetch('/api/assistant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: conversationPayload,
-            hostUrl: ollamaHost,
-            modelName: ollamaModel
+            provider: 'gemini',
+            apiKey: geminiKey,
+            modelName: geminiModel
           })
         })
       } else {
-        // Cloud production (Vercel): call Ollama directly from browser (resolving loopback locally)
-        res = await fetch(`${ollamaHost}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: ollamaModel,
-            messages: conversationPayload,
-            stream: false
+        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        if (isLocalhost) {
+          res = await fetch('/api/assistant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: conversationPayload,
+              provider: 'ollama',
+              hostUrl: ollamaHost,
+              modelName: ollamaModel
+            })
           })
-        })
+        } else {
+          res = await fetch(`${ollamaHost}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: ollamaModel,
+              messages: conversationPayload,
+              stream: false
+            })
+          })
+        }
       }
 
       if (!res.ok) {
         const errorText = await res.text()
-        throw new Error(errorText || 'Falha ao conectar com o Ollama.')
+        throw new Error(errorText || 'Falha ao conectar com o modelo de IA.')
       }
 
       const data = await res.json()
-      const assistantReply = isLocalhost ? data.message : (data.message?.content || 'Sem resposta.')
+      const isOllamaDirect = provider === 'ollama' && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+      const assistantReply = isOllamaDirect ? (data.message?.content || 'Sem resposta.') : (data.message || 'Sem resposta.')
       setMessages([...updatedMessages, { role: 'assistant', content: assistantReply }])
     } catch (err: any) {
       toast.error(err.message || 'Erro ao obter resposta do assistente.')
       
-      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      let errorMsg = `❌ Erro de Conexão: Não consegui me comunicar com o Ollama em \`${ollamaHost}\` usando o modelo \`${ollamaModel}\`.`
-      
-      if (!isLocalhost) {
-        errorMsg += `\n\n**Nota de Produção (Vercel)**:\nComo o ERP está rodando na nuvem, o seu navegador bloqueia a conexão local devido a restrições de CORS (segurança do navegador).\n\n**Como resolver isso de forma simples**:\n\n1. Feche o Ollama na barra de tarefas (caso esteja aberto).\n2. Abra o **Prompt de Comando (cmd)** do Windows e inicie o Ollama liberando o acesso (CORS) com o seguinte comando:\n   \`set OLLAMA_ORIGINS=*\`\n   \`ollama serve\`\n3. Deixe essa janela do cmd aberta e clique para enviar a pergunta novamente no ERP!`
+      let errorMsg = `❌ Erro de Conexão: Não consegui me comunicar com a IA.`
+      if (provider === 'gemini') {
+        errorMsg += `\n\nErro retornado pela API do Gemini. Certifique-se de que sua Chave de API está ativa e correta.`
       } else {
-        errorMsg += `\n\nCertifique-se de que o Ollama está rodando localmente e que o modelo está instalado (\`ollama run ${ollamaModel}\`).`
+        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        errorMsg += ` em \`${ollamaHost}\` usando o modelo \`${ollamaModel}\`.`
+        if (!isLocalhost) {
+          errorMsg += `\n\n**Nota de Produção (Vercel)**:\nComo o ERP está rodando na nuvem, o seu navegador bloqueia a conexão local devido a restrições de CORS (segurança do navegador).\n\n**Como resolver isso de forma simples**:\n\n1. Feche o Ollama na barra de tarefas (caso esteja aberto).\n2. Abra o **Prompt de Comando (cmd)** do Windows e inicie o Ollama liberando o acesso (CORS) com o seguinte comando:\n   \`set OLLAMA_ORIGINS=*\`\n   \`ollama serve\`\n3. Deixe essa janela do cmd aberta e clique para enviar a pergunta novamente no ERP!`
+        } else {
+          errorMsg += `\n\nCertifique-se de que o Ollama está rodando localmente e que o modelo está instalado (\`ollama run ${ollamaModel}\`).`
+        }
       }
       
       setMessages([...updatedMessages, { role: 'assistant', content: errorMsg }])
@@ -282,33 +310,70 @@ Diretrizes da IA:
         <Card className="border-indigo-500/25 bg-indigo-500/5 animate-in slide-in-from-top-2 duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-indigo-500" /> Parâmetros de Integração Local (Ollama)
+              <Terminal className="h-4 w-4 text-indigo-500" /> Parâmetros do Assistente de Inteligência Artificial
             </CardTitle>
             <CardDescription className="text-xs">
-              Para utilizar o assistente, você precisa ter o <a href="https://ollama.com" target="_blank" rel="noopener" className="underline text-indigo-500 font-bold">Ollama</a> rodando em seu computador.
+              Escolha entre usar a API da nuvem (Google Gemini) ou rodar um modelo de linguagem localmente em sua máquina (Ollama).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Endpoint / Host do Ollama</label>
-                <Input
-                  value={ollamaHost}
-                  onChange={e => setOllamaHost(e.target.value)}
-                  placeholder="Ex: http://127.0.0.1:11434"
-                  className="bg-card border-border/60 font-mono text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Modelo de Linguagem (LLM)</label>
-                <Input
-                  value={ollamaModel}
-                  onChange={e => setOllamaModel(e.target.value)}
-                  placeholder="Ex: llama3, mistral, gemma"
-                  className="bg-card border-border/60 font-mono text-xs"
-                />
-              </div>
+            <div className="space-y-1.5 max-w-sm">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">Provedor de Inteligência Artificial</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                value={provider}
+                onChange={e => setProvider(e.target.value as 'gemini' | 'ollama')}
+              >
+                <option value="gemini">Google Gemini (Nuvem - Rápido)</option>
+                <option value="ollama">Ollama (Local - Sem Custos)</option>
+              </select>
             </div>
+
+            {provider === 'gemini' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Chave de API (Gemini API Key)</label>
+                  <Input
+                    type="password"
+                    value={geminiKey}
+                    onChange={e => setGeminiKey(e.target.value)}
+                    placeholder="Chave de API do Gemini"
+                    className="bg-card border-border/60 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Modelo do Gemini</label>
+                  <Input
+                    value={geminiModel}
+                    onChange={e => setGeminiModel(e.target.value)}
+                    placeholder="Ex: gemini-1.5-flash, gemini-1.5-pro"
+                    className="bg-card border-border/60 font-mono text-xs"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Endpoint / Host do Ollama</label>
+                  <Input
+                    value={ollamaHost}
+                    onChange={e => setOllamaHost(e.target.value)}
+                    placeholder="Ex: http://127.0.0.1:11434"
+                    className="bg-card border-border/60 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase">Modelo do Ollama</label>
+                  <Input
+                    value={ollamaModel}
+                    onChange={e => setOllamaModel(e.target.value)}
+                    placeholder="Ex: llama3, mistral, gemma"
+                    className="bg-card border-border/60 font-mono text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={() => setIsConfigOpen(false)}>Cancelar</Button>
               <Button size="sm" onClick={handleSaveConfigs} className="bg-indigo-600 hover:bg-indigo-700">Salvar Ajustes</Button>
@@ -325,7 +390,7 @@ Diretrizes da IA:
             <div>
               <CardTitle className="text-sm font-bold flex items-center gap-1.5">
                 <Bot className="h-4 w-4 text-emerald-500" />
-                Agente Conectado: {ollamaModel}
+                Agente Conectado: {provider === 'gemini' ? geminiModel : ollamaModel} ({provider.toUpperCase()})
               </CardTitle>
               <CardDescription className="text-[10px] uppercase font-mono mt-0.5">
                 Contexto ativo: {isContextLoading ? 'Sincronizando...' : 'Carregado de Supabase'}

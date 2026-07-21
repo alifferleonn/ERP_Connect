@@ -2,35 +2,77 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
-    const { messages, hostUrl, modelName } = await req.json()
+    const { messages, provider, hostUrl, modelName, apiKey } = await req.json()
 
-    const ollamaUrl = `${hostUrl || 'http://127.0.0.1:11434'}/api/chat`
+    if (provider === 'gemini') {
+      const geminiKey = apiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+      const model = modelName || 'gemini-1.5-flash'
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-    const response = await fetch(ollamaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: modelName || 'llama3',
-        messages: messages,
-        stream: false, // keep it simple and clean
-      }),
-    })
+      // Format messages history to match Gemini's structure (role 'user' or 'model')
+      const geminiContents = messages
+        .filter((m: any) => m.role !== 'system')
+        .map((m: any) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
 
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`Erro na resposta do Ollama: ${errText || response.statusText}`)
+      const systemMsg = messages.find((m: any) => m.role === 'system')
+      const systemInstruction = systemMsg 
+        ? { parts: [{ text: systemMsg.content }] }
+        : undefined
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-goog-api-key': geminiKey
+        },
+        body: JSON.stringify({
+          contents: geminiContents,
+          systemInstruction: systemInstruction
+        })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Erro na API do Gemini: ${errText || response.statusText}`)
+      }
+
+      const data = await response.json()
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.'
+      return NextResponse.json({ message: reply })
+
+    } else {
+      // Ollama Provider
+      const ollamaUrl = `${hostUrl || 'http://127.0.0.1:11434'}/api/chat`
+
+      const response = await fetch(ollamaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName || 'llama3',
+          messages: messages,
+          stream: false,
+        }),
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Erro na resposta do Ollama: ${errText || response.statusText}`)
+      }
+
+      const data = await response.json()
+      return NextResponse.json({
+        message: data.message?.content || 'Sem resposta.'
+      })
     }
-
-    const data = await response.json()
-    return NextResponse.json({
-      message: data.message?.content || 'Sem resposta.'
-    })
   } catch (err: any) {
-    console.error('Ollama API proxy error:', err)
+    console.error('AI Assistant API route error:', err)
     return NextResponse.json(
-      { error: `Falha ao conectar com o Ollama: ${err.message || 'Servidor offline'}` },
+      { error: `Falha ao processar requisição de IA: ${err.message}` },
       { status: 500 }
     )
   }
