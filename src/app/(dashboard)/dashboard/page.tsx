@@ -475,39 +475,62 @@ export default function Page() {
   }
 
 
-  const metricsGrid = [
-    {
-      title: isFilial ? 'Caixa Atual (R$ BRL)' : 'Caixa Atual ($ USD)',
-      value: formatCurrency(cashFlowMetrics.currentCash),
-      icon: Coins,
-      color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
-      hasSettings: true,
-    },
-    {
-      title: isFilial ? 'Previsão de Faturamento (R$ BRL)' : 'Previsão de Faturamento ($ USD)',
-      value: formatCurrency(cashFlowMetrics.expectedRevenue),
-      icon: TrendingUp,
-      color: 'text-teal-500 bg-teal-500/10 border-teal-500/20',
-    },
-    {
-      title: isFilial ? 'Faturamento Total (R$ BRL)' : 'Faturamento Total ($ USD)',
-      value: formatCurrency(metrics.billing),
-      icon: DollarSign,
-      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-    },
-    {
-      title: isFilial ? 'Despesa de Compras (R$ BRL)' : 'Despesa de Compras ($ USD)',
-      value: formatCurrency(metrics.purchasesTotal),
-      icon: ShoppingCart,
-      color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
-    },
-    {
-      title: 'Vendas Realizadas',
-      value: `${metrics.salesCount} vendas`,
-      icon: ClipboardList,
-      color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
-    },
-  ]
+  const metricsGrid = !isFilial 
+    ? [
+        {
+          title: 'Caixa Atual ($ USD)',
+          value: formatCurrency(cashFlowMetrics.currentCash),
+          icon: Coins,
+          color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
+          hasSettings: true,
+        },
+        {
+          title: 'Previsão de Faturamento ($ USD)',
+          value: formatCurrency(cashFlowMetrics.expectedRevenue),
+          icon: TrendingUp,
+          color: 'text-teal-500 bg-teal-500/10 border-teal-500/20',
+        },
+        {
+          title: 'Faturamento Total ($ USD)',
+          value: formatCurrency(metrics.billing),
+          icon: DollarSign,
+          color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+        },
+        {
+          title: 'Despesa de Compras ($ USD)',
+          value: formatCurrency(metrics.purchasesTotal),
+          icon: ShoppingCart,
+          color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+        },
+        {
+          title: 'Vendas Realizadas',
+          value: `${metrics.salesCount} vendas`,
+          icon: ClipboardList,
+          color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+        }
+      ]
+    : [
+        {
+          title: 'Faturamento Total (R$ BRL)',
+          value: formatCurrency(metrics.billing),
+          icon: DollarSign,
+          color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+        },
+        {
+          title: 'Despesa de Compras (R$ BRL)',
+          value: formatCurrency(metrics.purchasesTotal),
+          icon: ShoppingCart,
+          color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+        },
+        {
+          title: 'Vendas Realizadas',
+          value: `${metrics.salesCount} vendas`,
+          icon: ClipboardList,
+          color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+        }
+      ]
+
+  const gridColsClass = !isFilial ? 'xl:grid-cols-5' : 'xl:grid-cols-3'
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -575,7 +598,7 @@ export default function Page() {
     </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${gridColsClass} gap-4`}>
         {metricsGrid.map((metric, idx) => {
           const Icon = metric.icon
           return (
