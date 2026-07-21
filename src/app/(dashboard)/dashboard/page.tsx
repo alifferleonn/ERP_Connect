@@ -20,7 +20,6 @@ import {
 import { 
   DollarSign, 
   ShoppingCart, 
-  Boxes, 
   ClipboardList, 
   TrendingUp,
   Package,
@@ -508,12 +507,6 @@ export default function Page() {
       icon: ClipboardList,
       color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
     },
-    {
-      title: 'Produtos Cadastrados',
-      value: `${metrics.products} itens`,
-      icon: Boxes,
-      color: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
-    },
   ]
 
   return (
@@ -582,7 +575,7 @@ export default function Page() {
     </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {metricsGrid.map((metric, idx) => {
           const Icon = metric.icon
           return (
