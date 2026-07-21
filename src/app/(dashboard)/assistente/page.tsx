@@ -174,26 +174,54 @@ Diretrizes da IA:
         ...updatedMessages
       ]
 
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: conversationPayload,
-          hostUrl: ollamaHost,
-          modelName: ollamaModel
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      
+      let res;
+      if (isLocalhost) {
+        // Local dev: call backend proxy to avoid CORS
+        res = await fetch('/api/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: conversationPayload,
+            hostUrl: ollamaHost,
+            modelName: ollamaModel
+          })
         })
-      })
+      } else {
+        // Cloud production (Vercel): call Ollama directly from browser (resolving loopback locally)
+        res = await fetch(`${ollamaHost}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: ollamaModel,
+            messages: conversationPayload,
+            stream: false
+          })
+        })
+      }
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Falha ao conectar com o modelo local.')
+        const errorText = await res.text()
+        throw new Error(errorText || 'Falha ao conectar com o Ollama.')
       }
 
       const data = await res.json()
-      setMessages([...updatedMessages, { role: 'assistant', content: data.message }])
+      const assistantReply = isLocalhost ? data.message : (data.message?.content || 'Sem resposta.')
+      setMessages([...updatedMessages, { role: 'assistant', content: assistantReply }])
     } catch (err: any) {
       toast.error(err.message || 'Erro ao obter resposta do assistente.')
-      setMessages([...updatedMessages, { role: 'assistant', content: `❌ Erro de Conexão: Não consegui me comunicar com o Ollama em \`${ollamaHost}\` usando o modelo \`${ollamaModel}\`. Certifique-se de que o Ollama está rodando e o modelo está instalado (\`ollama run ${ollamaModel}\`).` }])
+      
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      let errorMsg = `❌ Erro de Conexão: Não consegui me comunicar com o Ollama em \`${ollamaHost}\` usando o modelo \`${ollamaModel}\`.`
+      
+      if (!isLocalhost) {
+        errorMsg += `\n\n**Nota de Produção (Vercel)**:\nComo o ERP está rodando na nuvem, o seu navegador bloqueia a conexão local devido a restrições de CORS (segurança do navegador).\n\n**Como resolver isso de forma simples**:\n\n1. Feche o Ollama na barra de tarefas (caso esteja aberto).\n2. Abra o **Prompt de Comando (cmd)** do Windows e inicie o Ollama liberando o acesso (CORS) com o seguinte comando:\n   \`set OLLAMA_ORIGINS=*\`\n   \`ollama serve\`\n3. Deixe essa janela do cmd aberta e clique para enviar a pergunta novamente no ERP!`
+      } else {
+        errorMsg += `\n\nCertifique-se de que o Ollama está rodando localmente e que o modelo está instalado (\`ollama run ${ollamaModel}\`).`
+      }
+      
+      setMessages([...updatedMessages, { role: 'assistant', content: errorMsg }])
     } finally {
       setIsLoading(false)
     }
