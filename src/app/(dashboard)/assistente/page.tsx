@@ -206,7 +206,7 @@ Diretrizes da IA:
             <div>
               <CardTitle className="text-sm font-bold flex items-center gap-1.5">
                 <Bot className="h-4 w-4 text-emerald-500" />
-                Agente Conectado: Gemini 2.0 Flash Lite
+                Agente Conectado: Gemini 1.5 Flash
               </CardTitle>
               <CardDescription className="text-[10px] uppercase font-mono mt-0.5">
                 Contexto ativo: {isContextLoading ? 'Sincronizando...' : 'Carregado de Supabase'}

@@ -12,8 +12,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Use v1beta endpoint for Gemini 2.0 Flash Lite model
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`
+    // Use stable v1 endpoint and gemini-1.5-flash to ensure quota availability
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`
 
     // Format chat history to Gemini's expected structure (role 'user' or 'model')
     const geminiContents = messages
