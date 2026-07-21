@@ -25,10 +25,13 @@ import {
   TrendingUp,
   Package,
   PieChart as PieIcon,
-  BarChart3
+  BarChart3,
+  Settings,
+  Coins
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { useAuth } from '@/hooks/use-auth'
+import { toast } from 'sonner'
 
 async function getExchangeRate(): Promise<number> {
   if (typeof window === 'undefined') return 5.0
@@ -77,6 +80,15 @@ export default function Page() {
   const [topProductsData, setTopProductsData] = useState<any[]>([])
   const [filterRange, setFilterRange] = useState<'year' | '3months' | 'thismonth'>('year')
 
+  // Cash flow control states
+  const [initialCash, setInitialCash] = useState<number>(50000)
+  const [isCashModalOpen, setIsCashModalOpen] = useState(false)
+  const [tempCashInput, setTempCashInput] = useState('50000')
+  const [cashFlowMetrics, setCashFlowMetrics] = useState({
+    currentCash: 50000,
+    expectedRevenue: 0
+  })
+
   useEffect(() => {
     setMounted(true)
     async function loadData() {
@@ -99,7 +111,7 @@ export default function Page() {
         ] = await Promise.all([
           supabase.from('products').select('*', { count: 'exact', head: true }),
           supabase.from('suppliers').select('*', { count: 'exact', head: true }),
-          supabase.from('sales').select('total_amount, created_at, customer_name, product_id, products(name)'),
+          supabase.from('sales').select('total_amount, created_at, customer_name, status, product_id, products(name)'),
           purchasesQuery
         ])
 
@@ -310,6 +322,52 @@ export default function Page() {
           .sort((a, b) => b.value - a.value)
           .slice(0, 5)
 
+        // Calculate global cash stats by branch (ignoring date filters)
+        const branchSales = (salesData || []).filter((s) => {
+          if (isFilial) {
+            try {
+              const parsed = JSON.parse(s.customer_name)
+              return parsed.branch === filialName
+            } catch {
+              return false
+            }
+          } else {
+            try {
+              const parsed = JSON.parse(s.customer_name)
+              return !parsed.branch || parsed.branch === 'pharmix'
+            } catch {
+              return true
+            }
+          }
+        })
+
+        const branchPurchases = (purchasesData || []).filter((p) => {
+          const statusStr = p.status || ''
+          const hasSuffix = statusStr.includes('_')
+          const suffix = hasSuffix ? statusStr.split('_')[1] : null
+          if (isFilial) {
+            return suffix === filialName
+          } else {
+            return !suffix || suffix === 'pharmix'
+          }
+        })
+
+        const globalPurchasesSum = branchPurchases.reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0) * multiplier
+        const globalPaidSalesSum = branchSales
+          .filter(s => s.status === 'ENTREGUE')
+          .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
+        
+        const globalPendingSalesSum = branchSales
+          .filter(s => s.status !== 'ENTREGUE')
+          .reduce((acc, curr) => acc + (parseFloat(curr.total_amount) || 0), 0)
+
+        const calculatedCash = initialCash - globalPurchasesSum + globalPaidSalesSum
+
+        setCashFlowMetrics({
+          currentCash: calculatedCash,
+          expectedRevenue: globalPendingSalesSum
+        })
+
         setTopProductsData(productDataList)
 
         // Only display chart if there is actual activity
@@ -323,7 +381,17 @@ export default function Page() {
       }
     }
     loadData()
-  }, [user, filterRange])
+  }, [user, filterRange, initialCash])
+
+  // Load initial cash from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('dashboard_caixa_inicial')
+      if (stored) {
+        setInitialCash(parseFloat(stored))
+      }
+    }
+  }, [])
 
   if (!mounted) return null
 
@@ -410,6 +478,19 @@ export default function Page() {
 
   const metricsGrid = [
     {
+      title: isFilial ? 'Caixa Atual (R$ BRL)' : 'Caixa Atual ($ USD)',
+      value: formatCurrency(cashFlowMetrics.currentCash),
+      icon: Coins,
+      color: 'text-sky-500 bg-sky-500/10 border-sky-500/20',
+      hasSettings: true,
+    },
+    {
+      title: isFilial ? 'Previsão de Faturamento (R$ BRL)' : 'Previsão de Faturamento ($ USD)',
+      value: formatCurrency(cashFlowMetrics.expectedRevenue),
+      icon: TrendingUp,
+      color: 'text-teal-500 bg-teal-500/10 border-teal-500/20',
+    },
+    {
       title: isFilial ? 'Faturamento Total (R$ BRL)' : 'Faturamento Total ($ USD)',
       value: formatCurrency(metrics.billing),
       icon: DollarSign,
@@ -419,7 +500,7 @@ export default function Page() {
       title: isFilial ? 'Despesa de Compras (R$ BRL)' : 'Despesa de Compras ($ USD)',
       value: formatCurrency(metrics.purchasesTotal),
       icon: ShoppingCart,
-      color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+      color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
     },
     {
       title: 'Vendas Realizadas',
@@ -501,17 +582,31 @@ export default function Page() {
     </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricsGrid.map((metric, idx) => {
           const Icon = metric.icon
           return (
             <Card 
               key={idx} 
-              className="group transition-all duration-300 hover:shadow-lg border-border/50 bg-card"
+              className="group transition-all duration-300 hover:shadow-lg border-border/50 bg-card relative overflow-hidden"
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {metric.title}
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <span>{metric.title}</span>
+                  {metric.hasSettings && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setTempCashInput(initialCash.toString());
+                        setIsCashModalOpen(true);
+                      }}
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary flex items-center justify-center"
+                      title="Configurar Caixa Inicial"
+                    >
+                      <Settings className="h-3 w-3" />
+                    </button>
+                  )}
                 </CardTitle>
                 <div className={`p-2 rounded-lg border ${metric.color}`}>
                   <Icon className="h-4 w-4" />
@@ -677,6 +772,55 @@ export default function Page() {
           </Card>
         )}
       </div>
+
+      {/* Configure Initial Cash Modal */}
+      {isCashModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm p-4 flex justify-center items-center animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-sm rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+              <h2 className="text-sm font-bold uppercase tracking-wider">Ajustar Caixa Inicial</h2>
+              <button 
+                onClick={() => setIsCashModalOpen(false)} 
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">Caixa Inicial ({isFilial ? 'R$ BRL' : '$ USD'})</label>
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={tempCashInput}
+                  onChange={e => setTempCashInput(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  onClick={() => setIsCashModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded border border-border hover:bg-secondary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    const parsed = parseFloat(tempCashInput) || 0
+                    setInitialCash(parsed)
+                    localStorage.setItem('dashboard_caixa_inicial', parsed.toString())
+                    setIsCashModalOpen(false)
+                    toast.success('Caixa inicial atualizado com sucesso!')
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
