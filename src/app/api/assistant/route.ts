@@ -4,6 +4,9 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json()
     const geminiKey = process.env.GEMINI_API_KEY
+    
+    // Dynamically load the model name from the environment variable
+    const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
 
     if (!geminiKey) {
       return NextResponse.json(
@@ -12,8 +15,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // Use stable v1 endpoint and gemini-1.5-flash to ensure quota availability
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`
+    // Automatically select the correct API version depending on the model chosen
+    const apiVersion = model.startsWith('gemini-2.0') ? 'v1beta' : 'v1'
+    const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${geminiKey}`
 
     // Format chat history to Gemini's expected structure (role 'user' or 'model')
     const geminiContents = messages
