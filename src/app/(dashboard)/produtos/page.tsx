@@ -408,8 +408,8 @@ export default function ProductsPage() {
       {/* Creation Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20 shrink-0">
               <h2 className="text-lg font-bold">Novo Produto</h2>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -418,7 +418,7 @@ export default function ProductsPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <form onSubmit={handleCreateProduct} className="p-6 space-y-4">
+            <form onSubmit={handleCreateProduct} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5 col-span-1">
                   <label className="text-xs font-semibold text-muted-foreground uppercase">Princípio Ativo *</label>
@@ -554,8 +554,8 @@ export default function ProductsPage() {
       {/* Edit / Delete Product Modal */}
       {isDetailModalOpen && selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20">
+          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/20 shrink-0">
               <div>
                 <h2 className="text-lg font-bold">{user?.isFilial ? 'Detalhes do Produto' : 'Editar Produto'}</h2>
                 <p className="text-[10px] text-muted-foreground font-mono">ID: {selectedProduct.id}</p>
@@ -564,7 +564,7 @@ export default function ProductsPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <form onSubmit={user?.isFilial ? (e) => { e.preventDefault(); setIsDetailModalOpen(false); } : handleUpdateProduct} className="p-6 space-y-4">
+            <form onSubmit={user?.isFilial ? (e) => { e.preventDefault(); setIsDetailModalOpen(false); } : handleUpdateProduct} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5 col-span-1">
                   <label className="text-xs font-semibold text-muted-foreground uppercase">Princípio Ativo</label>
