@@ -631,7 +631,9 @@ export default function VendasPage() {
         warehouse: ''
       })
       loadSales()
-      handleOpenInvoice(newSaleObj)
+      if (!user?.isFilial) {
+        handleOpenInvoice(newSaleObj)
+      }
     } catch (err: any) {
       throw new Error(`Erro na baixa de estoque: ${err.message}`)
     } finally {
@@ -1040,7 +1042,7 @@ export default function VendasPage() {
                     <th className="py-3.5 px-6 text-right">Unitário</th>
                     <th className="py-3.5 px-6 text-right">Valor Total</th>
                     <th className="py-3.5 px-6 text-center">Status</th>
-                    <th className="py-3.5 px-6 text-center">Fatura</th>
+                    {!user?.isFilial && <th className="py-3.5 px-6 text-center">Fatura</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
@@ -1082,18 +1084,20 @@ export default function VendasPage() {
                           {sale.status || 'PENDENTE'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenInvoice(sale)}
-                          className="h-7 px-2.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 border border-indigo-500/20 rounded gap-1"
-                          title="Visualizar e Imprimir Invoice / Fatura da Venda"
-                        >
-                          <FileText className="h-3.5 w-3.5 text-indigo-500" />
-                          Invoice
-                        </Button>
-                      </td>
+                      {!user?.isFilial && (
+                        <td className="py-3.5 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenInvoice(sale)}
+                            className="h-7 px-2.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 border border-indigo-500/20 rounded gap-1"
+                            title="Visualizar e Imprimir Invoice / Fatura da Venda"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                            Invoice
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
