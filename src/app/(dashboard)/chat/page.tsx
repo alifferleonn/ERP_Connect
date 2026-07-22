@@ -11,7 +11,10 @@ import {
   Send, 
   Globe, 
   Search, 
-  Loader2
+  Loader2,
+  Bell,
+  BellRing,
+  BellOff
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -52,11 +55,40 @@ export default function ChatPage() {
   const [isSending, setIsSending] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [searchContact, setSearchContact] = useState('')
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const userEmail = user?.email?.toLowerCase() || ''
   const userName = user?.name || (user?.email?.split('@')[0] || 'Usuário')
   const userBranch = user?.isFilial ? (user.filialName || 'filial') : 'pharmix'
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission)
+    }
+  }, [])
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const perm = await Notification.requestPermission()
+        setNotificationPermission(perm)
+        if (perm === 'granted') {
+          toast.success('Notificações da área de trabalho ativadas com sucesso!')
+          new Notification('💬 Notificações Ativadas!', {
+            body: 'Você receberá alertas na área de trabalho quando receber novas mensagens.',
+            icon: '/favicon.ico'
+          })
+        } else if (perm === 'denied') {
+          toast.error('Notificações foram bloqueadas no seu navegador. Habilite nas configurações do site.')
+        }
+      } catch (e) {
+        console.error('Notification error:', e)
+      }
+    } else {
+      toast.error('Seu navegador não suporta notificações de área de trabalho')
+    }
+  }
 
   // Scroll to bottom when messages update
   const scrollToBottom = () => {
@@ -179,10 +211,61 @@ export default function ChatPage() {
   // Active conversation header info
   const activeContactInfo = PRESET_CONTACTS.find((c) => c.email.toLowerCase() === activeTarget.toLowerCase())
 
-  // Count unread or active count per contact
+  const [readMessageIds, setReadMessageIds] = useState<Set<string>>(new Set())
+
+  // Automatically mark visible messages as read when viewing a chat room
+  useEffect(() => {
+    if (!activeTarget) return
+    const currentRoomMsgIds = messages
+      .filter((m) => {
+        if (activeTarget === 'GERAL') {
+          return !m.recipient_email || m.recipient_email === 'GERAL'
+        } else {
+          return (
+            (m.sender_email.toLowerCase() === userEmail && m.recipient_email.toLowerCase() === activeTarget.toLowerCase()) ||
+            (m.sender_email.toLowerCase() === activeTarget.toLowerCase() && m.recipient_email.toLowerCase() === userEmail)
+          )
+        }
+      })
+      .map((m) => m.id)
+
+    if (currentRoomMsgIds.length > 0) {
+      setReadMessageIds((prev) => {
+        const next = new Set(prev)
+        let hasNew = false
+        currentRoomMsgIds.forEach((id) => {
+          if (!next.has(id)) {
+            next.add(id)
+            hasNew = true
+          }
+        })
+        return hasNew ? next : prev
+      })
+    }
+  }, [activeTarget, messages, userEmail])
+
+  const handleSelectTarget = (target: string) => {
+    setActiveTarget(target)
+    const roomMsgIds = messages
+      .filter((m) => {
+        if (target === 'GERAL') return !m.recipient_email || m.recipient_email === 'GERAL'
+        return m.sender_email.toLowerCase() === target.toLowerCase() && m.recipient_email.toLowerCase() === userEmail
+      })
+      .map((m) => m.id)
+
+    setReadMessageIds((prev) => {
+      const next = new Set(prev)
+      roomMsgIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
+
+  // Count unread messages per contact
   const getUnreadCount = (targetEmail: string) => {
     if (targetEmail === activeTarget) return 0
     return messages.filter((m) => {
+      if (readMessageIds.has(m.id)) return false
+
       if (targetEmail === 'GERAL') {
         return (!m.recipient_email || m.recipient_email === 'GERAL') && m.sender_email.toLowerCase() !== userEmail
       } else {
@@ -215,6 +298,33 @@ export default function ChatPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {notificationPermission === 'default' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={requestNotificationPermission}
+              className="gap-1.5 text-xs font-semibold border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+            >
+              <BellRing className="h-3.5 w-3.5" />
+              Ativar Notificações
+            </Button>
+          )}
+
+          {notificationPermission === 'granted' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/25">
+              <Bell className="h-3.5 w-3.5" />
+              Notificações Ativas
+            </span>
+          )}
+
+          {notificationPermission === 'denied' && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/25" title="Bloqueado nas configurações do navegador">
+              <BellOff className="h-3.5 w-3.5" />
+              Notificações Bloqueadas
+            </span>
+          )}
+
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/25">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -246,7 +356,7 @@ export default function ChatPage() {
           <CardContent className="p-2 space-y-1 overflow-y-auto flex-1 divide-y divide-border/20">
             {/* General Room */}
             <button
-              onClick={() => setActiveTarget('GERAL')}
+              onClick={() => handleSelectTarget('GERAL')}
               className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all ${
                 activeTarget === 'GERAL'
                   ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
@@ -280,7 +390,7 @@ export default function ChatPage() {
                 return (
                   <button
                     key={contact.id}
-                    onClick={() => setActiveTarget(contact.email)}
+                    onClick={() => handleSelectTarget(contact.email)}
                     className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left transition-all ${
                       isSelected
                         ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
