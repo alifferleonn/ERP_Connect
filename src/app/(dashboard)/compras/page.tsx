@@ -42,7 +42,8 @@ export default function ComprasPage() {
     quantity: '100',
     unit_price: '',
     total_amount: '',
-    status: 'PENDENTE'
+    status: 'PENDENTE',
+    warehouse: 'Dubai'
   })
 
   // Detail/Edit form state
@@ -59,7 +60,8 @@ export default function ComprasPage() {
   const [stockEntry, setStockEntry] = useState({
     batch_number: '',
     expiry_date: '',
-    track_code: ''
+    track_code: '',
+    warehouse: 'Dubai'
   })
 
   async function loadPurchases() {
@@ -189,6 +191,7 @@ export default function ComprasPage() {
           quantity: parseInt(form.quantity),
           unit_price: parseFloat(form.unit_price),
           total_amount: parseFloat(form.total_amount),
+          warehouse: isFilial ? 'Dubai' : (form.warehouse || 'Dubai'),
           status: purchaseStatus,
           created_at: new Date().toISOString()
         }])
@@ -205,6 +208,7 @@ export default function ComprasPage() {
             quantity: parseInt(form.quantity),
             batch_number: createStockEntry.batch_number,
             expiry_date: createStockEntry.expiry_date,
+            warehouse: isFilial ? 'Dubai' : (form.warehouse || 'Dubai'),
             status: 'AVAILABLE'
           }])
           .select()
@@ -243,7 +247,8 @@ export default function ComprasPage() {
         quantity: '100',
         unit_price: '',
         total_amount: '',
-        status: 'PENDENTE'
+        status: 'PENDENTE',
+        warehouse: 'Dubai'
       })
       setCreateStockEntry({
         batch_number: '',
@@ -268,10 +273,16 @@ export default function ComprasPage() {
       setStockEntry({
         batch_number: statusParts[2] || '',
         expiry_date: statusParts[3] || '',
-        track_code: statusParts[4] || ''
+        track_code: statusParts[4] || '',
+        warehouse: purchase.warehouse || 'Dubai'
       })
     } else {
-      setStockEntry({ batch_number: '', expiry_date: '', track_code: '' })
+      setStockEntry({
+        batch_number: '',
+        expiry_date: '',
+        track_code: '',
+        warehouse: purchase.warehouse || 'Dubai'
+      })
     }
 
     setShowStockEntryForm(false)
@@ -324,11 +335,14 @@ export default function ComprasPage() {
     try {
       const supabase = createClient()
 
-      // 1. Update purchase status to RECEBIDO
+      // 1. Update purchase status to RECEBIDO and update warehouse if changed
       const statusValue = user?.isFilial ? `RECEBIDO_${user.filialName}` : 'RECEBIDO'
       const { error: purchaseErr } = await supabase
         .from('purchases')
-        .update({ status: statusValue })
+        .update({ 
+          status: statusValue, 
+          warehouse: stockEntry.warehouse || selectedPurchase.warehouse || 'Dubai' 
+        })
         .eq('id', selectedPurchase.id)
       if (purchaseErr) throw purchaseErr
 
@@ -340,6 +354,7 @@ export default function ComprasPage() {
           quantity: selectedPurchase.quantity,
           batch_number: stockEntry.batch_number,
           expiry_date: stockEntry.expiry_date,
+          warehouse: stockEntry.warehouse || selectedPurchase.warehouse || 'Dubai',
           status: 'AVAILABLE'
         }])
         .select()
@@ -360,7 +375,7 @@ export default function ComprasPage() {
       toast.success('Recebimento confirmado! Lote adicionado ao estoque.')
       setIsDetailModalOpen(false)
       setShowStockEntryForm(false)
-      setStockEntry({ batch_number: '', expiry_date: '', track_code: '' })
+      setStockEntry({ batch_number: '', expiry_date: '', track_code: '', warehouse: 'Dubai' })
       loadPurchases()
     } catch (err: any) {
       toast.error(`Erro no recebimento de estoque: ${err.message || 'Verifique se as tabelas de estoque existem no Supabase'}`)
@@ -600,14 +615,29 @@ export default function ComprasPage() {
                     <option value="RECEBIDO">RECEBIDO</option>
                   </select>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Valor Total Calculado ($ USD)</label>
-                  <Input
-                    type="text"
-                    value={form.total_amount ? `$ ${form.total_amount}` : '$ 0.00'}
-                    disabled
-                  />
-                </div>
+                {!user?.isFilial ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Armazém Destino *</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={form.warehouse}
+                      onChange={e => setForm({...form, warehouse: e.target.value})}
+                    >
+                      <option value="Dubai">🇦🇪 Armazém Dubai</option>
+                      <option value="Uruguai">🇺🇾 Armazém Uruguai</option>
+                      <option value="Panamá">🇵🇦 Armazém Panamá</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Valor Total Calculado ($ USD)</label>
+                    <Input
+                      type="text"
+                      value={form.total_amount ? `$ ${form.total_amount}` : '$ 0.00'}
+                      disabled
+                    />
+                  </div>
+                )}
               </div>
 
               {form.status === 'RECEBIDO' && (
@@ -753,8 +783,23 @@ export default function ComprasPage() {
                     <span>Entrada de Lote no Estoque</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Ao definir o pedido como recebido, você deve informar a validade, o lote e o código de rastreamento para criar o lote no estoque.
+                    Ao definir o pedido como recebido, você deve confirmar o armazém, informar a validade, o lote e o código de rastreamento para criar o lote no estoque.
                   </p>
+
+                  {!user?.isFilial && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase font-bold text-primary">Armazém de Destino (Estoque) *</label>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-bold text-foreground"
+                        value={stockEntry.warehouse}
+                        onChange={e => setStockEntry({...stockEntry, warehouse: e.target.value})}
+                      >
+                        <option value="Dubai">🇦🇪 Armazém Dubai</option>
+                        <option value="Uruguai">🇺🇾 Armazém Uruguai</option>
+                        <option value="Panamá">🇵🇦 Armazém Panamá</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase">Número do Lote *</label>

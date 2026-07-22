@@ -47,6 +47,8 @@ export default function EstoquePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentTab, setCurrentTab] = useState<'disponivel' | 'entradas' | 'saidas' | 'para_entrar'>('disponivel')
 
+  const [warehouseFilter, setWarehouseFilter] = useState<'ALL' | 'Dubai' | 'Uruguai' | 'Panamá'>('ALL')
+
   // Manual movement form state
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false)
   const [movementForm, setMovementForm] = useState({
@@ -56,7 +58,8 @@ export default function EstoquePage() {
     batch_number: '',
     expiry_date: '',
     reference: 'Ajuste de Inventário',
-    selected_stock_id: ''
+    selected_stock_id: '',
+    warehouse: 'Dubai'
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -65,7 +68,8 @@ export default function EstoquePage() {
   const [selectedBatchToEdit, setSelectedBatchToEdit] = useState<any>(null)
   const [editBatchForm, setEditBatchForm] = useState({
     batch_number: '',
-    expiry_date: ''
+    expiry_date: '',
+    warehouse: 'Dubai'
   })
 
   const getExpiryStatusInfo = (expiryDateStr: string) => {
@@ -224,6 +228,7 @@ export default function EstoquePage() {
             quantity: qty,
             batch_number: movementForm.batch_number,
             expiry_date: movementForm.expiry_date,
+            warehouse: movementForm.warehouse || 'Dubai',
             status: 'AVAILABLE'
           }])
           .select()
@@ -288,7 +293,8 @@ export default function EstoquePage() {
         batch_number: '',
         expiry_date: '',
         reference: 'Ajuste de Inventário',
-        selected_stock_id: ''
+        selected_stock_id: '',
+        warehouse: 'Dubai'
       })
       loadStockData()
     } catch (err: any) {
@@ -298,17 +304,19 @@ export default function EstoquePage() {
     }
   }
 
-  const handleOpenEditBatch = (item: any, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleOpenEditBatch = (item: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
     setSelectedBatchToEdit(item)
+    const rawDate = item.expiryDate || item.expiry_date
     let formattedDate = ''
-    if (item.expiryDate || item.expiry_date) {
-      const d = new Date(item.expiryDate || item.expiry_date)
+    if (rawDate) {
+      const d = new Date(rawDate)
       formattedDate = d.toISOString().split('T')[0]
     }
     setEditBatchForm({
       batch_number: item.batchNumber || item.batch_number || '',
-      expiry_date: formattedDate
+      expiry_date: formattedDate,
+      warehouse: item.warehouse || 'Dubai'
     })
     setIsEditBatchModalOpen(true)
   }
@@ -321,6 +329,14 @@ export default function EstoquePage() {
       return
     }
 
+    const isWarehouseChanged = editBatchForm.warehouse !== (selectedBatchToEdit.warehouse || 'Dubai')
+    const confirmMessage = isWarehouseChanged
+      ? `Certeza dessa edição? O armazém deste lote será alterado para "${editBatchForm.warehouse}".`
+      : `Certeza dessa edição?`
+
+    const confirm = window.confirm(confirmMessage)
+    if (!confirm) return
+
     setIsSaving(true)
     try {
       const supabase = createClient()
@@ -328,13 +344,14 @@ export default function EstoquePage() {
         .from('stock')
         .update({
           batch_number: editBatchForm.batch_number,
-          expiry_date: editBatchForm.expiry_date
+          expiry_date: editBatchForm.expiry_date,
+          warehouse: editBatchForm.warehouse
         })
         .eq('id', selectedBatchToEdit.id)
 
       if (error) throw error
 
-      toast.success('Informações do lote atualizadas com sucesso!')
+      toast.success('Informações do lote e armazém atualizadas com sucesso!')
       setIsEditBatchModalOpen(false)
       setSelectedBatchToEdit(null)
       loadStockData()
@@ -363,7 +380,11 @@ export default function EstoquePage() {
   }
 
   // Group active stock items by product (ignoring items with status 'OUT_OF_STOCK' or quantity <= 0)
-  const activeStockItems = stockItems.filter(item => item.status !== 'OUT_OF_STOCK' && (item.quantity ?? 0) > 0)
+  const activeStockItems = stockItems.filter(item => {
+    const isAvailable = item.status !== 'OUT_OF_STOCK' && (item.quantity ?? 0) > 0
+    const matchesWarehouse = warehouseFilter === 'ALL' || (item.warehouse || 'Dubai') === warehouseFilter
+    return isAvailable && matchesWarehouse
+  })
   
   const stockByProduct: Record<string, any[]> = {}
   activeStockItems.forEach(item => {
@@ -374,7 +395,7 @@ export default function EstoquePage() {
     }
   })
 
-  // Build grouped stock catalog from ALL active products (even if they have 0 stock)
+  // Build grouped stock catalog from ALL active products
   const groupedStockList = products
     .filter((prod: any) => prod.status?.toLowerCase() !== 'inactive' && prod.status?.toLowerCase() !== 'inativo')
     .map((prod: any) => {
@@ -387,6 +408,13 @@ export default function EstoquePage() {
         totalQuantity,
         items
       }
+    })
+    // When filtering by a specific warehouse, show only products that have stock in that warehouse
+    .filter((prod: any) => {
+      if (warehouseFilter !== 'ALL') {
+        return prod.totalQuantity > 0
+      }
+      return true
     })
     // Filter by expiration alert if active
     .filter((prod: any) => {
@@ -417,10 +445,11 @@ export default function EstoquePage() {
     })
 
   // Movements classified as entries
-  const inputMovements = movements.filter(mov => 
-    (mov.type || '').toLowerCase().includes('entrada') || 
-    (mov.type || '').toLowerCase() === 'input'
-  )
+  const inputMovements = movements.filter(mov => {
+    const matchesType = (mov.type || '').toLowerCase().includes('entrada') || (mov.type || '').toLowerCase() === 'input'
+    const matchesWarehouse = warehouseFilter === 'ALL' || (mov.stock?.warehouse || 'Dubai') === warehouseFilter
+    return matchesType && matchesWarehouse
+  })
   const filteredInputs = inputMovements.filter(mov => 
     (mov.stock?.products?.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (mov.reference || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -428,11 +457,11 @@ export default function EstoquePage() {
   )
 
   // Movements classified as exits
-  const outputMovements = movements.filter(mov => 
-    (mov.type || '').toLowerCase().includes('saída') || 
-    (mov.type || '').toLowerCase().includes('saida') || 
-    (mov.type || '').toLowerCase() === 'output'
-  )
+  const outputMovements = movements.filter(mov => {
+    const matchesType = (mov.type || '').toLowerCase().includes('saída') || (mov.type || '').toLowerCase().includes('saida') || (mov.type || '').toLowerCase() === 'output'
+    const matchesWarehouse = warehouseFilter === 'ALL' || (mov.stock?.warehouse || 'Dubai') === warehouseFilter
+    return matchesType && matchesWarehouse
+  })
   const filteredOutputs = outputMovements.filter(mov => 
     (mov.stock?.products?.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (mov.reference || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -442,7 +471,9 @@ export default function EstoquePage() {
   // Upcoming items: purchases whose status does not start with RECEBIDO
   const incomingPurchases = purchases.filter(p => {
     const statusStr = p.status || ''
-    return !statusStr.toUpperCase().startsWith('RECEBIDO')
+    const isNotReceived = !statusStr.toUpperCase().startsWith('RECEBIDO')
+    const matchesWarehouse = warehouseFilter === 'ALL' || (p.warehouse || 'Dubai') === warehouseFilter
+    return isNotReceived && matchesWarehouse
   })
   const filteredIncoming = incomingPurchases.filter(p => 
     (p.products?.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -559,52 +590,71 @@ export default function EstoquePage() {
         </Card>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-border/40 pb-2">
-        <button
-          onClick={() => setCurrentTab('disponivel')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-            currentTab === 'disponivel'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Boxes className="h-4 w-4" />
-          Disponível em Estoque
-        </button>
-        <button
-          onClick={() => setCurrentTab('entradas')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-            currentTab === 'entradas'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <ArrowDownLeft className="h-4 w-4" />
-          Entradas ({filteredInputs.length})
-        </button>
-        <button
-          onClick={() => setCurrentTab('saidas')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-            currentTab === 'saidas'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <ArrowUpRight className="h-4 w-4" />
-          Saídas ({filteredOutputs.length})
-        </button>
-        <button
-          onClick={() => setCurrentTab('para_entrar')}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-            currentTab === 'para_entrar'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Truck className="h-4 w-4" />
-          Para Entrar ({filteredIncoming.length})
-        </button>
+      {/* Filter Tabs & Warehouse Selector */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/40 pb-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCurrentTab('disponivel')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              currentTab === 'disponivel'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Boxes className="h-4 w-4" />
+            Disponível em Estoque
+          </button>
+          <button
+            onClick={() => setCurrentTab('entradas')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              currentTab === 'entradas'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ArrowDownLeft className="h-4 w-4" />
+            Entradas ({filteredInputs.length})
+          </button>
+          <button
+            onClick={() => setCurrentTab('saidas')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              currentTab === 'saidas'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ArrowUpRight className="h-4 w-4" />
+            Saídas ({filteredOutputs.length})
+          </button>
+          <button
+            onClick={() => setCurrentTab('para_entrar')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              currentTab === 'para_entrar'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Truck className="h-4 w-4" />
+            Para Entrar ({incomingPurchases.length})
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-secondary/40 p-1 rounded-lg border border-border/40">
+          <span className="text-xs font-semibold text-muted-foreground px-2">Local:</span>
+          {(['ALL', 'Dubai', 'Uruguai', 'Panamá'] as const).map((wh) => (
+            <button
+              key={wh}
+              onClick={() => setWarehouseFilter(wh)}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                warehouseFilter === wh
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+              }`}
+            >
+              {wh === 'ALL' ? 'Todos Armazéns' : wh}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -740,6 +790,7 @@ export default function EstoquePage() {
                                       <thead>
                                         <tr className="bg-secondary/40 text-muted-foreground text-left font-semibold">
                                           <th className="py-2 px-3">Lote</th>
+                                          <th className="py-2 px-3">Armazém</th>
                                           <th className="py-2 px-3 text-right">Qtd</th>
                                           <th className="py-2 px-3">Vencimento</th>
                                           <th className="py-2 px-3 text-center">Status</th>
@@ -751,6 +802,11 @@ export default function EstoquePage() {
                                           <tr key={item.id} className="hover:bg-secondary/20 transition-colors">
                                             <td className="py-2.5 px-3 font-mono text-xs font-semibold text-muted-foreground">
                                               {item.batchNumber || item.batch_number}
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                                📍 {item.warehouse || 'Dubai'}
+                                              </span>
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono font-bold">
                                               {item.quantity}
@@ -899,6 +955,7 @@ export default function EstoquePage() {
                         <tr className="bg-secondary/20 border-b border-border/40 text-muted-foreground font-medium text-left">
                           <th className="py-3 px-6">Data do Pedido</th>
                           <th className="py-3 px-6">Medicamento</th>
+                          <th className="py-3 px-6">Armazém Destino</th>
                           <th className="py-3 px-6">Fornecedor</th>
                           <th className="py-3 px-6 text-right">Qtd Pedida</th>
                           <th className="py-3 px-6 text-center">Status</th>
@@ -913,6 +970,11 @@ export default function EstoquePage() {
                             <td className="py-3.5 px-6">
                               <div className="font-semibold">{p.products?.name || 'N/A'}</div>
                               <div className="text-[10px] text-muted-foreground font-mono">{p.products?.code || 'N/A'}</div>
+                            </td>
+                            <td className="py-3.5 px-6">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                                📍 {p.warehouse || 'Dubai'}
+                              </span>
                             </td>
                             <td className="py-3.5 px-6 font-semibold">
                               {p.suppliers?.company || 'N/A'}
@@ -1004,6 +1066,18 @@ export default function EstoquePage() {
                 <div className="space-y-4 p-4 bg-secondary/30 border border-border/40 rounded-lg animate-in fade-in duration-200">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Informações do Novo Lote</h3>
                   <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Armazém de Destino *</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring"
+                      value={movementForm.warehouse}
+                      onChange={e => setMovementForm({...movementForm, warehouse: e.target.value})}
+                    >
+                      <option value="Dubai">🇦🇪 Armazém Dubai</option>
+                      <option value="Uruguai">🇺🇾 Armazém Uruguai</option>
+                      <option value="Panamá">🇵🇦 Armazém Panamá</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Número do Lote *</label>
                     <Input
                       placeholder="Ex: LOTE-12345"
@@ -1093,6 +1167,20 @@ export default function EstoquePage() {
             </div>
 
             <form onSubmit={handleSaveBatchEdit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Armazém de Localização *</label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:ring-ring font-semibold"
+                  value={editBatchForm.warehouse}
+                  onChange={e => setEditBatchForm({...editBatchForm, warehouse: e.target.value})}
+                  required
+                >
+                  <option value="Dubai">🇦🇪 Armazém Dubai</option>
+                  <option value="Uruguai">🇺🇾 Armazém Uruguai</option>
+                  <option value="Panamá">🇵🇦 Armazém Panamá</option>
+                </select>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Número do Lote *</label>
                 <Input

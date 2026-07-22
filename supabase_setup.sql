@@ -7,7 +7,12 @@ ADD COLUMN IF NOT EXISTS price_trade NUMERIC(10, 2),
 ADD COLUMN IF NOT EXISTS price_connect NUMERIC(10, 2),
 ADD COLUMN IF NOT EXISTS price_bioss NUMERIC(10, 2);
 
--- 2. Tabela de configurações gerais (caso ainda não tenha sido criada)
+-- 2. Adicionar coluna de armazém nas tabelas de compras, estoque e vendas
+ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS warehouse TEXT DEFAULT 'Dubai';
+ALTER TABLE public.stock ADD COLUMN IF NOT EXISTS warehouse TEXT DEFAULT 'Dubai';
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS warehouse TEXT DEFAULT 'Dubai';
+
+-- 3. Tabela de configurações gerais (caso ainda não tenha sido criada)
 CREATE TABLE IF NOT EXISTS public.settings (
   id TEXT PRIMARY KEY,
   key TEXT UNIQUE NOT NULL,

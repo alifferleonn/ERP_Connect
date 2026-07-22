@@ -153,8 +153,11 @@ export default function VendasPage() {
     quantity: '1',
     unit_price: '',
     total_amount: '',
-    status: 'PENDENTE'
+    status: 'PENDENTE',
+    warehouse: ''
   })
+
+  const [availableWarehouses, setAvailableWarehouses] = useState<{ warehouse: string; quantity: number }[]>([])
 
   // Detail/Edit status state
   const [editStatus, setEditStatus] = useState('PENDENTE')
@@ -276,10 +279,35 @@ export default function VendasPage() {
       }
     }
 
+    // Query active stock per warehouse for this product
+    let whList: { warehouse: string; quantity: number }[] = []
+    if (productId && !isFilial) {
+      const supabase = createClient()
+      const { data: stockData } = await supabase
+        .from('stock')
+        .select('*')
+        .eq('product_id', productId)
+        .gt('quantity', 0)
+
+      const whMap: Record<string, number> = {}
+      ;(stockData || []).forEach(st => {
+        const wh = st.warehouse || 'Dubai'
+        whMap[wh] = (whMap[wh] || 0) + (st.quantity || 0)
+      })
+
+      // Show ONLY warehouses that have stock > 0
+      whList = Object.entries(whMap)
+        .filter(([_, qty]) => qty > 0)
+        .map(([wh, qty]) => ({ warehouse: wh, quantity: qty }))
+    }
+
+    setAvailableWarehouses(whList)
+
     setForm(prev => ({
       ...prev,
       product_id: productId,
-      unit_price: selectedProd ? finalSalePrice.toFixed(2) : ''
+      unit_price: selectedProd ? finalSalePrice.toFixed(2) : '',
+      warehouse: whList.length > 0 ? whList[0].warehouse : ''
     }))
   }
 
@@ -356,16 +384,21 @@ export default function VendasPage() {
     try {
       const supabase = createClient()
 
+      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+
       // 1. Get current stock
-      const { data: stockItems, error: stockErr } = await supabase
+      let stockQuery = supabase
         .from('stock')
         .select('*')
         .eq('product_id', form.product_id)
         .gt('quantity', 0)
-        .order('expiry_date', { ascending: true }) // FIFO
-      if (stockErr) throw stockErr
 
-      const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+      if (!isFilial && form.warehouse) {
+        stockQuery = stockQuery.eq('warehouse', form.warehouse)
+      }
+
+      const { data: stockItems, error: stockErr } = await stockQuery.order('expiry_date', { ascending: true }) // FIFO
+      if (stockErr) throw stockErr
 
       // Filials always request from Pharmix, so their local available stock is treated as 0
       const availableQty = isFilial ? 0 : (stockItems || []).reduce((acc, curr) => acc + (curr.quantity || 0), 0)
@@ -472,7 +505,8 @@ export default function VendasPage() {
         quantity: '1',
         unit_price: '',
         total_amount: '',
-        status: 'PENDENTE'
+        status: 'PENDENTE',
+        warehouse: ''
       })
       loadSales()
     } catch (err: any) {
@@ -1107,6 +1141,29 @@ export default function VendasPage() {
                   {/* Keep a hidden input to enforce standard HTML form validation if required is passed */}
                   <input type="hidden" name="product_id" value={form.product_id} required />
                 </div>
+
+                {!user?.isFilial && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Armazém de Saída (Origem) *</label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60 font-semibold"
+                      value={form.warehouse}
+                      onChange={e => setForm({...form, warehouse: e.target.value})}
+                      disabled={!form.product_id || availableWarehouses.length === 0}
+                      required
+                    >
+                      {availableWarehouses.length === 0 ? (
+                        <option value="">{form.product_id ? '⚠️ Nenhum armazém possui estoque disponível deste produto' : 'Selecione um produto primeiro'}</option>
+                      ) : (
+                        availableWarehouses.map(w => (
+                          <option key={w.warehouse} value={w.warehouse}>
+                            {w.warehouse === 'Dubai' ? '🇦🇪 Armazém Dubai' : w.warehouse === 'Uruguai' ? '🇺🇾 Armazém Uruguai' : '🇵🇦 Armazém Panamá'} (Saldo em estoque: {w.quantity} un)
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
