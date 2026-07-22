@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, X, Loader2, DollarSign, ClipboardList, AlertTriangle, Trash2 } from 'lucide-react'
+import { Plus, Search, X, Loader2, DollarSign, ClipboardList, AlertTriangle, Trash2, FileText, User, Building, Download, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { getBranchPrice } from '@/lib/utils'
+import pharmixLogo from '@/public/pharmix.png'
 
 async function getExchangeRate(): Promise<number> {
   if (typeof window === 'undefined') return 5.0
@@ -48,7 +49,79 @@ export default function VendasPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [clients, setClients] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
-  
+
+  // States for Invoice Modal
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
+  const [editableInvoice, setEditableInvoice] = useState<any>(null)
+  const [isEditingInvoice, setIsEditingInvoice] = useState(false)
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false)
+
+  const handleOpenInvoice = (sale: any) => {
+    const prod = products.find(p => p.id === sale.product_id) || sale.products || sale.product || {}
+    const customerInfo = parseCustomerInfo(sale.customer_name)
+
+    const initialData = {
+      invoice_number: `INV-PHX-${(sale.id || '00000000').slice(0, 8).toUpperCase()}`,
+      company_name: 'Pharmix Global',
+      company_sub: 'Global Pharmaceutical Supply Chain',
+      company_address: 'Matriz: Dubai International Free Zone, UAE | Panamá & Uruguai',
+      company_email: 'support@pharmix.com',
+      company_website: 'www.pharmix.com',
+      customer_name: customerInfo.name || 'Cliente / Filial',
+      customer_cpf: customerInfo.cpf || '',
+      customer_email: customerInfo.email || '',
+      warehouse: sale.warehouse || 'Dubai',
+      status: sale.status || 'CONCLUÍDO',
+      product_name: prod.name || 'Medicamento',
+      product_code: prod.code || 'N/A',
+      quantity: sale.quantity || 1,
+      unit_price: sale.unit_price || 0,
+      total_amount: sale.total_amount || ((sale.quantity || 1) * (sale.unit_price || 0)),
+      notes: 'Obrigado por sua preferência. Esta Invoice é emitida pelo ERP Pharmix Global.',
+      issue_date: new Date(sale.created_at || Date.now()).toLocaleDateString('pt-BR'),
+      issue_time: new Date(sale.created_at || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    }
+
+    setEditableInvoice(initialData)
+    setIsEditingInvoice(false)
+    setIsInvoiceModalOpen(true)
+  }
+
+  const downloadInvoicePDF = async (elementId: string, filename: string) => {
+    setIsDownloadingPDF(true)
+    try {
+      if (typeof window !== 'undefined') {
+        if (!(window as any).html2pdf) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script')
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error('Não foi possível carregar a biblioteca de PDF'))
+            document.body.appendChild(script)
+          })
+        }
+
+        const element = document.getElementById(elementId)
+        if (!element) throw new Error('Elemento da invoice não encontrado')
+
+        const opt = {
+          margin: 10,
+          filename: filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }
+
+        await (window as any).html2pdf().set(opt).from(element).save()
+        toast.success(`Download do arquivo ${filename} concluído!`)
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao gerar PDF: ${err.message}`)
+    } finally {
+      setIsDownloadingPDF(false)
+    }
+  }
+
   // States for searchable product input
   const [productSearch, setProductSearch] = useState('')
   const [showProductSuggestions, setShowProductSuggestions] = useState(false)
@@ -72,7 +145,7 @@ export default function VendasPage() {
     if (!product) return 0
     const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
     const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
-    
+
     let basePrice = getBranchPrice(product, filialName)
     if (isFilial) {
       basePrice = basePrice * exchangeRate
@@ -87,12 +160,12 @@ export default function VendasPage() {
 
   const getFilteredProducts = () => {
     const query = productSearch.toLowerCase()
-    
+
     const filtered = query
-      ? products.filter(p => 
-          p.name.toLowerCase().includes(query) || 
-          (p.code && p.code.toLowerCase().includes(query))
-        )
+      ? products.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        (p.code && p.code.toLowerCase().includes(query))
+      )
       : products
 
     const cheapestMap: { [key: string]: any } = {}
@@ -125,11 +198,18 @@ export default function VendasPage() {
     })
   }
 
+  const formatCurrencyUSD = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0)
+  }
+
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedSale, setSelectedSale] = useState<any>(null)
-  
+
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -266,7 +346,7 @@ export default function VendasPage() {
     const selectedProd = products.find(p => p.id === productId)
     const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
     const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
-    
+
     let finalSalePrice = 0
     if (selectedProd) {
       const baseBranchCost = getBranchPrice(selectedProd, filialName)
@@ -290,10 +370,10 @@ export default function VendasPage() {
         .gt('quantity', 0)
 
       const whMap: Record<string, number> = {}
-      ;(stockData || []).forEach(st => {
-        const wh = st.warehouse || 'Dubai'
-        whMap[wh] = (whMap[wh] || 0) + (st.quantity || 0)
-      })
+        ; (stockData || []).forEach(st => {
+          const wh = st.warehouse || 'Dubai'
+          whMap[wh] = (whMap[wh] || 0) + (st.quantity || 0)
+        })
 
       // Show ONLY warehouses that have stock > 0
       whList = Object.entries(whMap)
@@ -332,7 +412,7 @@ export default function VendasPage() {
       ? getBranchPrice(product, filialName)
       : parseFloat(product.purchase_price || 0)
     const totalPurchaseCost = needed * purchaseUnitPrice
-    
+
     const purchaseStatus = isFilial ? `PENDENTE_${filialName}` : 'PENDENTE'
 
     const { error: purchaseErr } = await supabase
@@ -447,7 +527,7 @@ export default function VendasPage() {
         // Update batch quantity
         const { error: updateErr } = await supabase
           .from('stock')
-          .update({ 
+          .update({
             quantity: newQty,
             status: newQty === 0 ? 'OUT_OF_STOCK' : item.status
           })
@@ -479,7 +559,7 @@ export default function VendasPage() {
       }
 
       // Insert Sale with chosen status
-      const { error: saleErr } = await supabase
+      const { data: createdSale, error: saleErr } = await supabase
         .from('sales')
         .insert([{
           customer_name: customerNameValue,
@@ -490,9 +570,23 @@ export default function VendasPage() {
           status: form.status,
           created_at: new Date().toISOString()
         }])
+        .select()
+
       if (saleErr) throw saleErr
 
-      // If the user is a filial, trigger the automatic purchase and Pharmix sale flow - Removed (initiated on Compras page now)
+      const newSaleObj = {
+        id: (createdSale && createdSale[0]?.id) || 'N/A',
+        customer_name: customerNameValue,
+        customer_cpf: form.customer_cpf,
+        customer_email: form.customer_email,
+        created_at: new Date().toISOString(),
+        product_id: form.product_id,
+        quantity: quantityToDeduct,
+        unit_price: parseFloat(form.unit_price),
+        total_amount: parseFloat(form.total_amount),
+        status: form.status,
+        warehouse: form.warehouse || 'Dubai'
+      }
 
       toast.success('Venda concluída e estoque baixado com sucesso!')
       setIsModalOpen(false)
@@ -509,6 +603,7 @@ export default function VendasPage() {
         warehouse: ''
       })
       loadSales()
+      handleOpenInvoice(newSaleObj)
     } catch (err: any) {
       throw new Error(`Erro na baixa de estoque: ${err.message}`)
     } finally {
@@ -523,7 +618,7 @@ export default function VendasPage() {
     try {
       const { needed, product, stockItems = [], sellQty = 0 } = deficitInfo
       await createPendingPurchase(product, needed)
-      
+
       // Execute and persist the sale as well
       await executeSaleAndDeductStock(stockItems, sellQty)
 
@@ -556,7 +651,7 @@ export default function VendasPage() {
         .from('sales')
         .update({ status: editStatus })
         .eq('id', selectedSale.id)
-      
+
       if (error) throw error
       toast.success('Status da venda atualizado com sucesso!')
       setIsDetailModalOpen(false)
@@ -581,7 +676,7 @@ export default function VendasPage() {
         .from('sales')
         .delete()
         .eq('id', selectedSale.id)
-      
+
       if (error) throw error
       toast.success('Venda excluída com sucesso!')
       setIsDetailModalOpen(false)
@@ -596,7 +691,7 @@ export default function VendasPage() {
   const handleOpenShipment = async (sale: any) => {
     try {
       const supabase = createClient()
-      
+
       // Fetch product with suppliers relation
       const { data: prodData, error: prodErr } = await supabase
         .from('products')
@@ -666,7 +761,7 @@ export default function VendasPage() {
         // Update batch quantity
         const { error: updateErr } = await supabase
           .from('stock')
-          .update({ 
+          .update({
             quantity: newQty,
             status: newQty === 0 ? 'OUT_OF_STOCK' : item.status
           })
@@ -694,7 +789,7 @@ export default function VendasPage() {
 
       // Update matching Branch Purchase to RECEBIDO with details encoded in status
       const branchName = selectedSale.customer_name.replace('Filial ', '').toLowerCase()
-      
+
       const { data: purchaseData, error: findPurchaseErr } = await supabase
         .from('purchases')
         .select('*')
@@ -708,7 +803,7 @@ export default function VendasPage() {
         // Format of new status: RECEBIDO_branchName_batch_expiry_track
         const formattedExpiry = new Date(usedExpiryDate).toISOString().split('T')[0]
         const statusValue = `RECEBIDO_${branchName}_${usedBatchNumber}_${formattedExpiry}_${shipmentTrackCode}`
-        
+
         await supabase
           .from('purchases')
           .update({ status: statusValue })
@@ -820,7 +915,7 @@ export default function VendasPage() {
             Gerencie vendas em {user?.isFilial ? 'reais (R$ BRL)' : 'dólares ($ USD)'}. Clique em um registro para atualizar o status de entrega ou excluir.
           </p>
         </div>
-        <Button 
+        <Button
           className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
           onClick={() => {
             setShowAutoPurchasePanel(false);
@@ -917,12 +1012,13 @@ export default function VendasPage() {
                     <th className="py-3.5 px-6 text-right">Unitário</th>
                     <th className="py-3.5 px-6 text-right">Valor Total</th>
                     <th className="py-3.5 px-6 text-center">Status</th>
+                    <th className="py-3.5 px-6 text-center">Fatura</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
                   {sales.map((sale) => (
-                    <tr 
-                      key={sale.id} 
+                    <tr
+                      key={sale.id}
                       className="hover:bg-secondary/60 cursor-pointer transition-colors"
                       onClick={() => handleOpenDetail(sale)}
                       title="Clique para editar ou excluir"
@@ -958,6 +1054,18 @@ export default function VendasPage() {
                           {sale.status || 'PENDENTE'}
                         </span>
                       </td>
+                      <td className="py-3.5 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenInvoice(sale)}
+                          className="h-7 px-2.5 text-xs font-bold text-indigo-500 hover:text-indigo-600 hover:bg-indigo-500/10 border border-indigo-500/20 rounded gap-1"
+                          title="Visualizar e Imprimir Invoice / Fatura da Venda"
+                        >
+                          <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                          Invoice
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -975,11 +1083,11 @@ export default function VendasPage() {
               <h2 className="text-lg font-bold">
                 {!showAutoPurchasePanel ? 'Registrar Venda ($ USD)' : 'Estoque Insuficiente - Compra Semiautomática'}
               </h2>
-              <button 
+              <button
                 onClick={() => {
                   setIsModalOpen(false);
                   setShowAutoPurchasePanel(false);
-                }} 
+                }}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -1022,7 +1130,7 @@ export default function VendasPage() {
                   <Input
                     placeholder="Ex: Farmácia Popular Centro"
                     value={form.customer_name}
-                    onChange={e => setForm({...form, customer_name: e.target.value})}
+                    onChange={e => setForm({ ...form, customer_name: e.target.value })}
                     required
                   />
                 </div>
@@ -1035,7 +1143,7 @@ export default function VendasPage() {
                         <Input
                           placeholder="000.000.000-00"
                           value={form.customer_cpf}
-                          onChange={e => setForm({...form, customer_cpf: e.target.value})}
+                          onChange={e => setForm({ ...form, customer_cpf: e.target.value })}
                           required
                         />
                       </div>
@@ -1045,7 +1153,7 @@ export default function VendasPage() {
                           type="email"
                           placeholder="cliente@email.com"
                           value={form.customer_email}
-                          onChange={e => setForm({...form, customer_email: e.target.value})}
+                          onChange={e => setForm({ ...form, customer_email: e.target.value })}
                           required
                         />
                       </div>
@@ -1148,7 +1256,7 @@ export default function VendasPage() {
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60 font-semibold"
                       value={form.warehouse}
-                      onChange={e => setForm({...form, warehouse: e.target.value})}
+                      onChange={e => setForm({ ...form, warehouse: e.target.value })}
                       disabled={!form.product_id || availableWarehouses.length === 0}
                       required
                     >
@@ -1172,7 +1280,7 @@ export default function VendasPage() {
                       type="number"
                       min="1"
                       value={form.quantity}
-                      onChange={e => setForm({...form, quantity: e.target.value})}
+                      onChange={e => setForm({ ...form, quantity: e.target.value })}
                       required
                     />
                   </div>
@@ -1184,7 +1292,7 @@ export default function VendasPage() {
                       type="number"
                       step="0.01"
                       value={form.unit_price}
-                      onChange={e => setForm({...form, unit_price: e.target.value})}
+                      onChange={e => setForm({ ...form, unit_price: e.target.value })}
                       required
                     />
                   </div>
@@ -1196,7 +1304,7 @@ export default function VendasPage() {
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       value={form.status}
-                      onChange={e => setForm({...form, status: e.target.value})}
+                      onChange={e => setForm({ ...form, status: e.target.value })}
                     >
                       <option value="PENDENTE">PENDENTE</option>
                       <option value="SAIU PARA ENTREGA">SAIU PARA ENTREGA</option>
@@ -1248,15 +1356,15 @@ export default function VendasPage() {
                       <span className="font-bold text-amber-600">{deficitInfo?.needed} un.</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                       <span className="text-muted-foreground">Custo Unitário</span>
-                       <span className="font-mono font-semibold">{formatCurrency(parseFloat(user?.isFilial ? (deficitInfo?.product?.sale_price || deficitInfo?.product?.purchase_price || 0) : (deficitInfo?.product?.purchase_price || 0)))}</span>
-                     </div>
-                     <div className="flex items-center justify-between border-t border-border/45 pt-2">
-                       <span className="font-bold text-xs text-foreground">Total da Compra</span>
-                       <span className="font-mono font-extrabold text-foreground">
-                         {formatCurrency(deficitInfo ? deficitInfo.needed * parseFloat(user?.isFilial ? (deficitInfo.product.sale_price || deficitInfo.product.purchase_price || 0) : (deficitInfo.product.purchase_price || 0)) : 0)}
-                       </span>
-                     </div>
+                      <span className="text-muted-foreground">Custo Unitário</span>
+                      <span className="font-mono font-semibold">{formatCurrency(parseFloat(user?.isFilial ? (deficitInfo?.product?.sale_price || deficitInfo?.product?.purchase_price || 0) : (deficitInfo?.product?.purchase_price || 0)))}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/45 pt-2">
+                      <span className="font-bold text-xs text-foreground">Total da Compra</span>
+                      <span className="font-mono font-extrabold text-foreground">
+                        {formatCurrency(deficitInfo ? deficitInfo.needed * parseFloat(user?.isFilial ? (deficitInfo.product.sale_price || deficitInfo.product.purchase_price || 0) : (deficitInfo.product.purchase_price || 0)) : 0)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1265,17 +1373,17 @@ export default function VendasPage() {
                 </p>
 
                 <div className="flex gap-3 pt-4 border-t border-border">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setShowAutoPurchasePanel(false)}
                     className="flex-1"
                   >
                     Voltar
                   </Button>
-                  <Button 
-                    type="button" 
-                    onClick={handleConfirmAutoPurchase} 
+                  <Button
+                    type="button"
+                    onClick={handleConfirmAutoPurchase}
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                     disabled={isSaving}
                   >
@@ -1298,14 +1406,14 @@ export default function VendasPage() {
                 <h2 className="text-lg font-bold">Detalhes da Venda</h2>
                 <p className="text-[10px] text-muted-foreground font-mono">ID: {selectedSale.id}</p>
               </div>
-              <button 
-                onClick={() => setIsDetailModalOpen(false)} 
+              <button
+                onClick={() => setIsDetailModalOpen(false)}
                 className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-secondary"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               {/* Order Info */}
               <div className="grid grid-cols-2 gap-4 text-sm bg-secondary/30 p-3 rounded-lg border border-border/40">
@@ -1324,7 +1432,7 @@ export default function VendasPage() {
                   )}
                   {parseCustomerInfo(selectedSale.customer_name).document_data && (
                     <div className="mt-2">
-                      <a 
+                      <a
                         href={parseCustomerInfo(selectedSale.customer_name).document_data}
                         download={`documento-${parseCustomerInfo(selectedSale.customer_name).name.replace(/\s+/g, '_')}`}
                         className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
@@ -1367,34 +1475,34 @@ export default function VendasPage() {
               {/* Actions Footer */}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
                 {!user?.isFilial && selectedSale.customer_name?.startsWith('Filial ') && (selectedSale.status === 'PENDENTE' || selectedSale.status === 'COMPRA_SOLICITADA') && (
-                  <Button 
-                    onClick={() => handleOpenShipment(selectedSale)} 
+                  <Button
+                    onClick={() => handleOpenShipment(selectedSale)}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors"
                   >
                     🚀 Enviar para Filial
                   </Button>
                 )}
-                <Button 
-                  onClick={handleUpdateStatus} 
-                  className="w-full" 
+                <Button
+                  onClick={handleUpdateStatus}
+                  className="w-full"
                   disabled={isSaving}
                 >
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Atualizar Status de Entrega
                 </Button>
-                
+
                 <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsDetailModalOpen(false)}
                     className="flex-1"
                   >
                     Fechar
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="destructive" 
+                  <Button
+                    type="button"
+                    variant="destructive"
                     onClick={handleDeleteSale}
                     disabled={isDeleting}
                     className="flex-1 gap-1.5"
@@ -1417,8 +1525,8 @@ export default function VendasPage() {
                 <h2 className="text-lg font-bold">Enviar Pedido para Filial</h2>
                 <p className="text-xs text-muted-foreground">{selectedSale.products?.name} - {selectedSale.quantity} un.</p>
               </div>
-              <button 
-                onClick={() => setIsShipmentModalOpen(false)} 
+              <button
+                onClick={() => setIsShipmentModalOpen(false)}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -1444,9 +1552,9 @@ export default function VendasPage() {
                     </p>
 
                     <div className="flex pt-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => setIsShipmentModalOpen(false)}
                         className="w-full"
                       >
@@ -1471,17 +1579,17 @@ export default function VendasPage() {
                     </p>
 
                     <div className="flex gap-3 pt-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => setIsShipmentModalOpen(false)}
                         className="flex-1"
                       >
                         Voltar
                       </Button>
-                      <Button 
-                        type="button" 
-                        onClick={handleGeneratePharmixPurchase} 
+                      <Button
+                        type="button"
+                        onClick={handleGeneratePharmixPurchase}
                         className="flex-1 bg-primary text-primary-foreground font-bold"
                         disabled={isSaving}
                       >
@@ -1506,7 +1614,7 @@ export default function VendasPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Código de Rastreio (Track Code) *</label>
-                  <Input 
+                  <Input
                     placeholder="Ex: BR123456789XX"
                     value={shipmentTrackCode}
                     onChange={e => setShipmentTrackCode(e.target.value)}
@@ -1515,16 +1623,16 @@ export default function VendasPage() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-border">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsShipmentModalOpen(false)}
                     className="flex-1"
                   >
                     Voltar
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                     disabled={isSaving}
                   >
@@ -1534,6 +1642,286 @@ export default function VendasPage() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {isInvoiceModalOpen && editableInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col">
+            {/* Modal Top Actions */}
+            <div className="flex items-center justify-between border-b border-border p-4 bg-secondary/30 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-emerald-500" />
+                <h2 className="text-lg font-bold">Invoice / Fatura da Venda</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant={isEditingInvoice ? "default" : "outline"}
+                  onClick={() => setIsEditingInvoice(!isEditingInvoice)}
+                  className="gap-1.5 font-semibold text-xs"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {isEditingInvoice ? 'Visualizar Preview' : 'Editar Invoice'}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => downloadInvoicePDF('printable-invoice', `${editableInvoice.invoice_number || 'Invoice'}.pdf`)}
+                  disabled={isDownloadingPDF}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-semibold shadow-sm text-xs"
+                >
+                  {isDownloadingPDF ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  Baixar Arquivo .PDF
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceModalOpen(false)}
+                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-secondary"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Editable Form Header (When Editing Mode is Active) */}
+            {isEditingInvoice && (
+              <div className="p-4 bg-secondary/30 border-b border-border space-y-3 text-xs shrink-0 animate-in slide-in-from-top-3 duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                    <Pencil className="h-3.5 w-3.5 text-primary" /> Edição Livre da Invoice (Altera os dados do preview abaixo em tempo real)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Número da Invoice</label>
+                    <Input
+                      className="h-8 text-xs font-mono"
+                      value={editableInvoice.invoice_number}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, invoice_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Nome do Cliente / Filial</label>
+                    <Input
+                      className="h-8 text-xs font-semibold"
+                      value={editableInvoice.customer_name}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, customer_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">CPF / CNPJ</label>
+                    <Input
+                      className="h-8 text-xs font-mono"
+                      value={editableInvoice.customer_cpf}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, customer_cpf: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Email do Cliente</label>
+                    <Input
+                      className="h-8 text-xs"
+                      value={editableInvoice.customer_email}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, customer_email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Armazém de Saída</label>
+                    <select
+                      className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs font-semibold"
+                      value={editableInvoice.warehouse}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, warehouse: e.target.value })}
+                    >
+                      <option value="Dubai">Dubai</option>
+                      <option value="Uruguai">Uruguai</option>
+                      <option value="Panamá">Panamá</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Nome do Medicamento</label>
+                    <Input
+                      className="h-8 text-xs font-bold"
+                      value={editableInvoice.product_name}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, product_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Princípio Ativo</label>
+                    <Input
+                      className="h-8 text-xs font-mono"
+                      value={editableInvoice.product_code}
+                      onChange={e => setEditableInvoice({ ...editableInvoice, product_code: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Quantidade</label>
+                    <Input
+                      type="number"
+                      className="h-8 text-xs font-bold"
+                      value={editableInvoice.quantity}
+                      onChange={e => {
+                        const q = parseInt(e.target.value) || 0
+                        const total = q * (editableInvoice.unit_price || 0)
+                        setEditableInvoice({ ...editableInvoice, quantity: q, total_amount: total })
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-muted-foreground">Preço Unitário</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="h-8 text-xs font-mono"
+                      value={editableInvoice.unit_price}
+                      onChange={e => {
+                        const p = parseFloat(e.target.value) || 0
+                        const total = (editableInvoice.quantity || 0) * p
+                        setEditableInvoice({ ...editableInvoice, unit_price: p, total_amount: total })
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Printable Invoice Container */}
+            <div className="p-8 overflow-y-auto flex-1 bg-white text-slate-900 font-sans" id="printable-invoice">
+              {/* Header: Company Logo & Info */}
+              <div className="flex justify-between items-start border-b-2 border-indigo-600 pb-6 mb-6 gap-4">
+                <div className="flex items-start gap-4 flex-1 min-w-0">
+                  <img
+                    src={pharmixLogo.src}
+                    alt="Pharmix Logo"
+                    className="h-14 w-auto object-contain shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl font-extrabold tracking-tight text-indigo-950 uppercase truncate">
+                      {editableInvoice.company_name}
+                    </h1>
+                    <p className="text-[11px] font-semibold text-indigo-600 tracking-wider uppercase mt-0.5">
+                      {editableInvoice.company_sub}
+                    </p>
+                    <div className="text-[11px] text-slate-500 mt-1.5 space-y-0.5 font-mono">
+                      <p>📍 {editableInvoice.company_address}</p>
+                      <p>🌐 Website: {editableInvoice.company_website} | Suporte: {editableInvoice.company_email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div className="text-right">
+                    <div className="text-xs font-bold text-indigo-600 uppercase tracking-widest">INVOICE Nº</div>
+                    <div className="text-base font-mono font-extrabold text-slate-900 mt-0.5" style={{ color: '#0f172a' }}>
+                      {editableInvoice.invoice_number}
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-2 font-mono whitespace-nowrap">
+                    <p>Data: <strong>{editableInvoice.issue_date}</strong></p>
+                    <p>Hora: <strong>{editableInvoice.issue_time}</strong></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer & Order Information */}
+              <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-xs">
+                <div>
+                  <h3 className="font-bold text-indigo-950 uppercase tracking-wider text-[11px] mb-2 flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-600" /> Faturado Para (Cliente / Filial)
+                  </h3>
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-slate-900">{editableInvoice.customer_name}</p>
+                    {editableInvoice.customer_cpf && (
+                      <p className="font-mono text-slate-600">CPF / CNPJ: {editableInvoice.customer_cpf}</p>
+                    )}
+                    {editableInvoice.customer_email && (
+                      <p className="text-slate-600">Email: {editableInvoice.customer_email}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-indigo-950 uppercase tracking-wider text-[11px] mb-2 flex items-center gap-1.5">
+                    <Building className="h-3.5 w-3.5 text-indigo-600" /> Origem &amp; Status
+                  </h3>
+                  <div className="space-y-1">
+                    <p>Armazém de Saída: <strong className="text-indigo-900">📍 Armazém {editableInvoice.warehouse}</strong></p>
+                    <p>Status da Transação: <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">{editableInvoice.status}</span></p>
+                    <p>Moeda da Fatura: <strong>{user?.isFilial ? 'BRL (R$ Reais)' : 'USD ($ Dólares)'}</strong></p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-indigo-950 text-white font-semibold">
+                    <tr>
+                      <th className="py-3 px-4">Medicamento / Item</th>
+                      <th className="py-3 px-4">Princípio Ativo</th>
+                      <th className="py-3 px-4 text-center">Qtd</th>
+                      <th className="py-3 px-4 text-right">Preço Unitário</th>
+                      <th className="py-3 px-4 text-right">Valor Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    <tr>
+                      <td className="py-3.5 px-4 font-bold text-slate-900">
+                        {editableInvoice.product_name}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-600">
+                        {editableInvoice.product_code}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-bold">
+                        {editableInvoice.quantity} un.
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono">
+                        {user?.isFilial ? formatCurrency(editableInvoice.unit_price) : formatCurrencyUSD(editableInvoice.unit_price)}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-indigo-950">
+                        {user?.isFilial ? formatCurrency(editableInvoice.total_amount) : formatCurrencyUSD(editableInvoice.total_amount)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Total Calculation & Certified Seal */}
+              <div className="flex justify-between items-end border-t border-slate-200 pt-4 mb-8">
+                {/* Official Certified Seal */}
+                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 p-3 rounded-xl max-w-xs">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    ✓
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-emerald-900 uppercase">Fatura Certificada</div>
+                    <div className="text-[10px] text-emerald-700">Documento Autorizado pela Pharmix Global</div>
+                  </div>
+                </div>
+
+                {/* Subtotal & Total */}
+                <div className="w-64 space-y-1.5 text-right">
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Subtotal:</span>
+                    <span className="font-mono">{user?.isFilial ? formatCurrency(editableInvoice.total_amount) : formatCurrencyUSD(editableInvoice.total_amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Impostos &amp; Taxas:</span>
+                    <span className="font-mono">$0.00</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-extrabold text-indigo-950 border-t-2 border-indigo-600 pt-2">
+                    <span>TOTAL FATURADO:</span>
+                    <span className="font-mono text-indigo-900 text-base">{user?.isFilial ? formatCurrency(editableInvoice.total_amount) : formatCurrencyUSD(editableInvoice.total_amount)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Terms */}
+              <div className="text-[10px] text-slate-400 text-center border-t border-slate-200 pt-4 font-mono">
+                <p>{editableInvoice.notes}</p>
+                <p>Pharmix Global © 2026 - Todos os direitos reservados.</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
