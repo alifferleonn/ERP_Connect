@@ -8,6 +8,7 @@ import { Plus, Search, X, Loader2, ShoppingCart, Trash2, CalendarCheck } from 'l
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { getBranchPrice } from '@/lib/utils'
 
 export default function ComprasPage() {
   const { user } = useAuth()
@@ -101,7 +102,7 @@ export default function ComprasPage() {
       const supabase = createClient()
       const [supsRes, prodsRes] = await Promise.all([
         supabase.from('suppliers').select('id, company'),
-        supabase.from('products').select('id, name, purchase_price, sale_price, supplier_id')
+        supabase.from('products').select('id, name, purchase_price, sale_price, price_trade, price_connect, price_bioss, supplier_id')
       ])
       setSuppliers(supsRes.data || [])
       setAllProducts(prodsRes.data || [])
@@ -144,8 +145,9 @@ export default function ComprasPage() {
 
   const handleProductChange = (productId: string) => {
     const selectedProd = filteredProducts.find(p => p.id === productId)
+    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
     const defaultUnitPrice = selectedProd
-      ? parseFloat(user?.isFilial ? (selectedProd.sale_price ?? selectedProd.purchase_price) : selectedProd.purchase_price)
+      ? parseFloat((user?.isFilial ? getBranchPrice(selectedProd, filialName) : (selectedProd.purchase_price || 0)).toString())
       : 0
 
     setForm(prev => ({

@@ -30,6 +30,23 @@ export function formatDateTime(date: Date): string {
   }).format(date)
 }
 
+export function getBranchPrice(product: any, branchName?: string | null): number {
+  if (!product) return 0
+  const b = (branchName || '').toLowerCase()
+
+  if (b.includes('trade') && product.price_trade !== null && product.price_trade !== undefined && parseFloat(product.price_trade) > 0) {
+    return parseFloat(product.price_trade)
+  }
+  if ((b.includes('connect') || b.includes('connecthealth')) && product.price_connect !== null && product.price_connect !== undefined && parseFloat(product.price_connect) > 0) {
+    return parseFloat(product.price_connect)
+  }
+  if (b.includes('bioss') && product.price_bioss !== null && product.price_bioss !== undefined && parseFloat(product.price_bioss) > 0) {
+    return parseFloat(product.price_bioss)
+  }
+
+  return parseFloat(product.sale_price || product.purchase_price || 0)
+}
+
 export function slugify(text: string): string {
   return text
     .toLowerCase()

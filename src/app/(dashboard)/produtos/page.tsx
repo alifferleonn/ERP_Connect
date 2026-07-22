@@ -9,13 +9,28 @@ import { Plus, Search, X, Trash2, PackageSearch, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { getBranchPrice } from '@/lib/utils'
 
 export default function ProductsPage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [skip, setSkip] = useState(0)
   const [suppliers, setSuppliers] = useState<any[]>([])
+  const [exchangeRate, setExchangeRate] = useState(5.4)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      fetch('https://open.er-api.com/v6/latest/USD')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.rates && data.rates.BRL) {
+            setExchangeRate(data.rates.BRL)
+          }
+        })
+        .catch(() => setExchangeRate(5.4))
+    }
+  }, [])
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -31,6 +46,9 @@ export default function ProductsPage() {
     name: '',
     purchase_price: '',
     sale_price: '',
+    price_trade: '',
+    price_connect: '',
+    price_bioss: '',
     supplier_id: '',
     description: '',
     status: 'Ativo'
@@ -42,6 +60,9 @@ export default function ProductsPage() {
     name: '',
     purchase_price: '',
     sale_price: '',
+    price_trade: '',
+    price_connect: '',
+    price_bioss: '',
     supplier_id: '',
     description: '',
     status: 'Ativo'
@@ -91,6 +112,9 @@ export default function ProductsPage() {
         name: form.name,
         purchase_price: parseFloat(form.purchase_price),
         sale_price: parseFloat(form.sale_price),
+        price_trade: form.price_trade ? parseFloat(form.price_trade) : null,
+        price_connect: form.price_connect ? parseFloat(form.price_connect) : null,
+        price_bioss: form.price_bioss ? parseFloat(form.price_bioss) : null,
         supplier_id: form.supplier_id,
         description: form.description,
         status: form.status,
@@ -106,6 +130,9 @@ export default function ProductsPage() {
         name: '',
         purchase_price: '',
         sale_price: '',
+        price_trade: '',
+        price_connect: '',
+        price_bioss: '',
         supplier_id: '',
         description: '',
         status: 'Ativo'
@@ -123,6 +150,9 @@ export default function ProductsPage() {
       name: product.name || '',
       purchase_price: product.purchase_price ? parseFloat(product.purchase_price).toString() : '',
       sale_price: product.sale_price ? parseFloat(product.sale_price).toString() : '',
+      price_trade: product.price_trade !== null && product.price_trade !== undefined ? parseFloat(product.price_trade).toString() : '',
+      price_connect: product.price_connect !== null && product.price_connect !== undefined ? parseFloat(product.price_connect).toString() : '',
+      price_bioss: product.price_bioss !== null && product.price_bioss !== undefined ? parseFloat(product.price_bioss).toString() : '',
       supplier_id: product.supplier_id || '',
       description: product.description || '',
       status: product.status || 'Ativo'
@@ -147,6 +177,9 @@ export default function ProductsPage() {
           name: editForm.name,
           purchase_price: parseFloat(editForm.purchase_price),
           sale_price: parseFloat(editForm.sale_price),
+          price_trade: editForm.price_trade ? parseFloat(editForm.price_trade) : null,
+          price_connect: editForm.price_connect ? parseFloat(editForm.price_connect) : null,
+          price_bioss: editForm.price_bioss ? parseFloat(editForm.price_bioss) : null,
           supplier_id: editForm.supplier_id,
           description: editForm.description,
           status: editForm.status
@@ -188,10 +221,17 @@ export default function ProductsPage() {
     }
   }
 
-  const formatCurrency = (val: number) => {
+  const formatCurrencyUSD = (val: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
+    }).format(val)
+  }
+
+  const formatCurrencyBRL = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
     }).format(val)
   }
 
@@ -290,13 +330,16 @@ export default function ProductsPage() {
                     <th className="py-3.5 px-6">Nome</th>
                     {user?.isFilial ? (
                       <>
-                        <th className="py-3.5 px-6 text-right">Custo da Filial</th>
-                        <th className="py-3.5 px-6 text-right">Preço Venda Final</th>
+                        <th className="py-3.5 px-6 text-right">Custo Compra Pharmix ($ USD)</th>
+                        <th className="py-3.5 px-6 text-right text-primary font-bold">Preço Venda Final (R$ BRL)</th>
                       </>
                     ) : (
                       <>
-                        <th className="py-3.5 px-6 text-right">Preço Compra</th>
-                        <th className="py-3.5 px-6 text-right">Preço Venda</th>
+                        <th className="py-3.5 px-6 text-right">Custo Importação ($)</th>
+                        <th className="py-3.5 px-6 text-right">Preço Padrão ($)</th>
+                        <th className="py-3.5 px-6 text-right text-amber-500">Custo Trade ($)</th>
+                        <th className="py-3.5 px-6 text-right text-indigo-500">Custo Connect ($)</th>
+                        <th className="py-3.5 px-6 text-right text-emerald-500">Custo Bioss ($)</th>
                       </>
                     )}
                     <th className="py-3.5 px-6 text-center">Status</th>
@@ -318,20 +361,29 @@ export default function ProductsPage() {
                       </td>
                       {user?.isFilial ? (
                         <>
-                           <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
-                             {formatCurrency(parseFloat(product.sale_price ?? 0))}
-                           </td>
-                           <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
-                             {formatCurrency(parseFloat(product.sale_price ?? 0) * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connecthealth' ? 1.8 : user?.filialName === 'connect' ? 1.5 : 1))}
-                           </td>
+                          <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
+                            {formatCurrencyUSD(getBranchPrice(product, user?.filialName))}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono font-bold text-primary">
+                            {formatCurrencyBRL(getBranchPrice(product, user?.filialName) * exchangeRate * 1.30)}
+                          </td>
                         </>
                       ) : (
                         <>
                           <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
-                            {formatCurrency(product.purchase_price)}
+                            {formatCurrencyUSD(product.purchase_price)}
                           </td>
-                          <td className="py-3.5 px-6 text-right font-mono font-medium text-primary">
-                            {formatCurrency(product.sale_price)}
+                          <td className="py-3.5 px-6 text-right font-mono text-muted-foreground">
+                            {formatCurrencyUSD(product.sale_price)}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono font-medium text-amber-500">
+                            {formatCurrencyUSD(product.price_trade ?? product.sale_price)}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono font-medium text-indigo-500">
+                            {formatCurrencyUSD(product.price_connect ?? product.sale_price)}
+                          </td>
+                          <td className="py-3.5 px-6 text-right font-mono font-medium text-emerald-500">
+                            {formatCurrencyUSD(product.price_bioss ?? product.sale_price)}
                           </td>
                         </>
                       )}
@@ -440,6 +492,42 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              <div className="border-t border-border/40 pt-3 space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">Custo de Compra por Filial ($ USD)</span>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-amber-500 uppercase">Trade ($ USD)</label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      placeholder={form.sale_price || "0.00"} 
+                      value={form.price_trade}
+                      onChange={e => setForm({...form, price_trade: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-indigo-500 uppercase">Connect ($ USD)</label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      placeholder={form.sale_price || "0.00"} 
+                      value={form.price_connect}
+                      onChange={e => setForm({...form, price_connect: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-emerald-500 uppercase">Bioss ($ USD)</label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      placeholder={form.sale_price || "0.00"} 
+                      value={form.price_bioss}
+                      onChange={e => setForm({...form, price_bioss: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">Descrição</label>
                 <textarea 
@@ -532,21 +620,21 @@ export default function ProductsPage() {
               <div className="grid gap-4 grid-cols-2">
                 {user?.isFilial ? (
                   <>
-                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase">Preço de Custo (Filial) ($ USD)</label>
+                    <div className="space-y-1.5 col-span-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Custo Compra ($ USD)</label>
                       <Input 
-                        type="number"
-                        value={editForm.sale_price}
+                        type="text"
+                        value={formatCurrencyUSD(getBranchPrice(selectedProduct, user?.filialName))}
                         disabled
                       />
                     </div>
-                    <div className="space-y-1.5">
-                       <label className="text-xs font-semibold text-muted-foreground uppercase">Venda Final Sugerido ($ USD)</label>
-                       <Input 
-                         type="number"
-                         value={(parseFloat(editForm.sale_price || '0') * (user?.filialName === 'trade' ? 2 : user?.filialName === 'connecthealth' ? 1.8 : user?.filialName === 'connect' ? 1.5 : 1)).toFixed(2)}
-                         disabled
-                       />
+                    <div className="space-y-1.5 col-span-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase font-bold text-primary">Preço Venda Final (+30%) (R$ BRL)</label>
+                      <Input 
+                        type="text"
+                        value={formatCurrencyBRL(getBranchPrice(selectedProduct, user?.filialName) * exchangeRate * 1.30)}
+                        disabled
+                      />
                     </div>
                   </>
                 ) : (
@@ -570,6 +658,41 @@ export default function ProductsPage() {
                         onChange={e => setEditForm({...editForm, sale_price: e.target.value})}
                         required
                       />
+                    </div>
+                    <div className="border-t border-border/40 pt-3 space-y-2 col-span-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-primary">Custo de Compra por Filial ($ USD)</span>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-amber-500 uppercase">Trade</label>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            placeholder={editForm.sale_price || "0.00"} 
+                            value={editForm.price_trade}
+                            onChange={e => setEditForm({...editForm, price_trade: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-indigo-500 uppercase">Connect</label>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            placeholder={editForm.sale_price || "0.00"} 
+                            value={editForm.price_connect}
+                            onChange={e => setEditForm({...editForm, price_connect: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-500 uppercase">Bioss</label>
+                          <Input 
+                            type="number"
+                            step="0.01"
+                            placeholder={editForm.sale_price || "0.00"} 
+                            value={editForm.price_bioss}
+                            onChange={e => setEditForm({...editForm, price_bioss: e.target.value})}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}

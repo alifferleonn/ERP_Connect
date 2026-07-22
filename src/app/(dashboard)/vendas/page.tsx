@@ -8,6 +8,7 @@ import { Plus, Search, X, Loader2, DollarSign, ClipboardList, AlertTriangle, Tra
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import { getBranchPrice } from '@/lib/utils'
 
 async function getExchangeRate(): Promise<number> {
   if (typeof window === 'undefined') return 5.0
@@ -69,17 +70,19 @@ export default function VendasPage() {
 
   const getProductFinalPrice = (product: any) => {
     if (!product) return 0
-    let price = parseFloat(product.sale_price || 0)
-    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
+    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
+    
+    let basePrice = getBranchPrice(product, filialName)
     if (isFilial) {
-      price = price * exchangeRate
-      const isTradeFilial = user?.filialName === 'trade'
-      const isConnectHealthFilial = user?.filialName === 'connecthealth'
-      const isConnectFilial = user?.filialName === 'connect'
+      basePrice = basePrice * exchangeRate
+      const isTradeFilial = filialName === 'trade'
+      const isConnectHealthFilial = filialName === 'connecthealth'
+      const isConnectFilial = filialName === 'connect'
       const defaultMarkup = isTradeFilial ? 2 : isConnectHealthFilial ? 1.8 : isConnectFilial ? 1.5 : 1
-      price = price * defaultMarkup
+      basePrice = basePrice * defaultMarkup
     }
-    return price
+    return basePrice
   }
 
   const getFilteredProducts = () => {
@@ -258,22 +261,20 @@ export default function VendasPage() {
 
   const handleProductChange = async (productId: string) => {
     const selectedProd = products.find(p => p.id === productId)
-    const isTradeFilial = user?.filialName === 'trade'
-    const isConnectHealthFilial = user?.filialName === 'connecthealth'
-    const isConnectFilial = user?.filialName === 'connect'
-    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect')))
+    const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
+    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
     
-    let retailPrice = selectedProd
-      ? parseFloat(selectedProd.sale_price || 0)
-      : 0
-
-    if (isFilial) {
-      const rate = await getExchangeRate()
-      retailPrice = retailPrice * rate
+    let finalSalePrice = 0
+    if (selectedProd) {
+      const baseBranchCost = getBranchPrice(selectedProd, filialName)
+      if (isFilial) {
+        const rate = await getExchangeRate()
+        // Convert USD cost to BRL with 30% margin (1.30)
+        finalSalePrice = baseBranchCost * rate * 1.30
+      } else {
+        finalSalePrice = parseFloat(selectedProd.sale_price || 0)
+      }
     }
-
-    const defaultMarkup = isTradeFilial ? 2 : isConnectHealthFilial ? 1.8 : isConnectFilial ? 1.5 : 1
-    const finalSalePrice = retailPrice * defaultMarkup
 
     setForm(prev => ({
       ...prev,
@@ -296,11 +297,11 @@ export default function VendasPage() {
   const createPendingPurchase = async (product: any, needed: number) => {
     const supabase = createClient()
     const isFilial = user?.isFilial
-    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
+    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
     const pharmixSupplierId = getPharmixSupplierId(suppliers)
 
     const purchaseUnitPrice = isFilial
-      ? parseFloat(product.sale_price || product.purchase_price || 0)
+      ? getBranchPrice(product, filialName)
       : parseFloat(product.purchase_price || 0)
     const totalPurchaseCost = needed * purchaseUnitPrice
     

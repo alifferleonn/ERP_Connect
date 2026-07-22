@@ -55,6 +55,36 @@ interface UrgentLot {
   branch: string
 }
 
+async function getExchangeRate(): Promise<number> {
+  if (typeof window === 'undefined') return 5.4
+  const CACHE_KEY = 'usd_brl_rate'
+  const CACHE_TIME_KEY = 'usd_brl_rate_timestamp'
+  const ONE_HOUR = 60 * 60 * 1000
+
+  const cachedRate = localStorage.getItem(CACHE_KEY)
+  const cachedTime = localStorage.getItem(CACHE_TIME_KEY)
+  const now = Date.now()
+
+  if (cachedRate && cachedTime && (now - parseInt(cachedTime) < ONE_HOUR)) {
+    return parseFloat(cachedRate)
+  }
+
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD')
+    const data = await res.json()
+    if (data && data.rates && data.rates.BRL) {
+      const rate = data.rates.BRL
+      localStorage.setItem(CACHE_KEY, rate.toString())
+      localStorage.setItem(CACHE_TIME_KEY, now.toString())
+      return rate
+    }
+  } catch (err) {
+    console.error('Failed to fetch exchange rate:', err)
+  }
+
+  return 5.4
+}
+
 export default function TVDashboardPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -126,6 +156,25 @@ export default function TVDashboardPage() {
       const startOfToday = new Date()
       startOfToday.setHours(0, 0, 0, 0)
 
+      // Fetch live exchange rate
+      const rate = await getExchangeRate()
+
+      const getSaleBrlAmount = (s: any) => {
+        const rawAmount = parseFloat(s.total_amount) || 0
+        let isPharmixSale = true
+        try {
+          const parsed = JSON.parse(s.customer_name)
+          if (parsed && parsed.branch && parsed.branch !== 'pharmix') {
+            isPharmixSale = false
+          }
+        } catch {
+          isPharmixSale = true
+        }
+
+        // Convert Pharmix USD sales to BRL. Filial sales are already in BRL.
+        return isPharmixSale ? rawAmount * rate : rawAmount
+      }
+
       // 1. Fetch sales of the current month
       const { data: salesData } = await supabase
         .from('sales')
@@ -138,13 +187,13 @@ export default function TVDashboardPage() {
       setSalesCount(activeSales.length)
 
       // Calculate total BRL billing
-      const sumBrl = activeSales.reduce((acc, curr) => acc + (curr.total_amount || 0), 0)
+      const sumBrl = activeSales.reduce((acc, curr) => acc + getSaleBrlAmount(curr), 0)
       setTotalBilling(sumBrl)
 
       // Calculate today's BRL billing
       const todayTotal = activeSales
         .filter(sale => new Date(sale.created_at) >= startOfToday)
-        .reduce((acc, curr) => acc + (curr.total_amount || 0), 0)
+        .reduce((acc, curr) => acc + getSaleBrlAmount(curr), 0)
       setTodayBilling(todayTotal)
 
       // Build daily data for the current month
@@ -158,7 +207,7 @@ export default function TVDashboardPage() {
         const saleDate = new Date(sale.created_at)
         const dayNum = saleDate.getDate()
         if (dayNum >= 1 && dayNum <= totalDays) {
-          daysArray[dayNum - 1].vendas += (sale.total_amount || 0)
+          daysArray[dayNum - 1].vendas += getSaleBrlAmount(sale)
         }
       })
       setDailyData(daysArray)
@@ -173,8 +222,8 @@ export default function TVDashboardPage() {
             branch = parsed.branch
           }
         } catch {}
-        const amount = parseFloat(s.total_amount) || 0
-        branchBillingMap[branch] = (branchBillingMap[branch] || 0) + amount
+        const amountBrl = getSaleBrlAmount(s)
+        branchBillingMap[branch] = (branchBillingMap[branch] || 0) + amountBrl
       })
 
       const branchColors: Record<string, string> = {
