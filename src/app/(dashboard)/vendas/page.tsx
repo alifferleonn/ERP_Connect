@@ -378,6 +378,17 @@ export default function VendasPage() {
     return parseFloat(selectedProd.sale_price || selectedProd.purchase_price || 0)
   }
 
+  const getAutoPurchaseUnitPrice = (product: any) => {
+    if (!product) return 0
+    const isFilialUser = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
+    const userFilialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
+
+    if (isFilialUser) {
+      return getBranchPrice(product, userFilialName)
+    }
+    return parseFloat(product.purchase_price || 0)
+  }
+
   const handleProductChange = async (productId: string) => {
     const selectedProd = products.find(p => p.id === productId)
     const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
@@ -1395,7 +1406,9 @@ export default function VendasPage() {
                   <div className="bg-secondary/40 p-4 rounded-lg border border-border/40 space-y-3">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Fornecedor</span>
-                      <span className="font-semibold text-foreground">{deficitInfo?.product?.suppliers?.company || 'Não cadastrado'}</span>
+                      <span className="font-semibold text-foreground">
+                        {user?.isFilial ? 'Pharmix Matriz' : (deficitInfo?.product?.suppliers?.company || 'Matriz')}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Qtd Necessária</span>
@@ -1403,12 +1416,14 @@ export default function VendasPage() {
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Custo Unitário</span>
-                      <span className="font-mono font-semibold">{formatCurrency(parseFloat(user?.isFilial ? (deficitInfo?.product?.sale_price || deficitInfo?.product?.purchase_price || 0) : (deficitInfo?.product?.purchase_price || 0)))}</span>
+                      <span className="font-mono font-semibold">
+                        {formatCurrencyUSD(getAutoPurchaseUnitPrice(deficitInfo?.product))}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between border-t border-border/45 pt-2">
                       <span className="font-bold text-xs text-foreground">Total da Compra</span>
                       <span className="font-mono font-extrabold text-foreground">
-                        {formatCurrency(deficitInfo ? deficitInfo.needed * parseFloat(user?.isFilial ? (deficitInfo.product.sale_price || deficitInfo.product.purchase_price || 0) : (deficitInfo.product.purchase_price || 0)) : 0)}
+                        {formatCurrencyUSD(deficitInfo ? deficitInfo.needed * getAutoPurchaseUnitPrice(deficitInfo.product) : 0)}
                       </span>
                     </div>
                   </div>
