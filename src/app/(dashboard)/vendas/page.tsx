@@ -79,7 +79,8 @@ export default function VendasPage() {
       total_amount: sale.total_amount || ((sale.quantity || 1) * (sale.unit_price || 0)),
       notes: 'Obrigado por sua preferência. Esta Invoice é emitida pelo ERP Pharmix Global.',
       issue_date: new Date(sale.created_at || Date.now()).toLocaleDateString('pt-BR'),
-      issue_time: new Date(sale.created_at || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      issue_time: new Date(sale.created_at || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      exchange_rate: sale.exchange_rate || null
     }
 
     setEditableInvoice(initialData)
@@ -463,7 +464,8 @@ export default function VendasPage() {
         unit_price: purchaseUnitPrice,
         total_amount: totalPurchaseCost,
         status: purchaseStatus,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        exchange_rate: exchangeRate
       }])
 
     if (purchaseErr) throw purchaseErr
@@ -476,7 +478,8 @@ export default function VendasPage() {
         unit_price: purchaseUnitPrice,
         total_amount: totalPurchaseCost,
         status: 'PENDENTE',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        exchange_rate: exchangeRate
       }])
       if (autoSaleErr) console.error('Erro ao gerar venda automática na Pharmix:', autoSaleErr)
     }
@@ -597,19 +600,20 @@ export default function VendasPage() {
         })
       }
 
-      // Insert Sale with chosen status
-      const { data: createdSale, error: saleErr } = await supabase
-        .from('sales')
-        .insert([{
-          customer_name: customerNameValue,
-          product_id: form.product_id,
-          quantity: quantityToDeduct,
-          unit_price: parseFloat(form.unit_price),
-          total_amount: parseFloat(form.total_amount),
-          status: form.status,
-          created_at: new Date().toISOString()
-        }])
-        .select()
+       // Insert Sale with chosen status
+       const { data: createdSale, error: saleErr } = await supabase
+         .from('sales')
+         .insert([{
+           customer_name: customerNameValue,
+           product_id: form.product_id,
+           quantity: quantityToDeduct,
+           unit_price: parseFloat(form.unit_price),
+           total_amount: parseFloat(form.total_amount),
+           status: form.status,
+           created_at: new Date().toISOString(),
+           exchange_rate: exchangeRate
+         }])
+         .select()
 
       if (saleErr) throw saleErr
 
@@ -1516,6 +1520,11 @@ export default function VendasPage() {
                 <div className="col-span-2 border-t border-border/40 pt-2">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground">Faturamento</span>
                   <div className="font-bold text-emerald-600 dark:text-emerald-400 text-lg">{formatCurrency(selectedSale.total_amount)}</div>
+                  {selectedSale.exchange_rate && parseFloat(selectedSale.exchange_rate) > 1 && (
+                    <div className="text-[11px] text-muted-foreground font-mono mt-1">
+                      Taxa de Câmbio Histórica: 1 USD = R$ {parseFloat(selectedSale.exchange_rate).toFixed(4)}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1909,6 +1918,9 @@ export default function VendasPage() {
                     <p>Armazém de Saída: <strong className="text-indigo-900">📍 Armazém {editableInvoice.warehouse}</strong></p>
                     <p>Status da Transação: <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">{editableInvoice.status}</span></p>
                     <p>Moeda da Fatura: <strong>{user?.isFilial ? 'BRL (R$ Reais)' : 'USD ($ Dólares)'}</strong></p>
+                    {editableInvoice.exchange_rate && parseFloat(editableInvoice.exchange_rate) > 1 && (
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">Taxa de Câmbio: <strong>1 USD = R$ {parseFloat(editableInvoice.exchange_rate).toFixed(4)}</strong></p>
+                    )}
                   </div>
                 </div>
               </div>

@@ -18,6 +18,18 @@ export default function ComprasPage() {
   const [allProducts, setAllProducts] = useState<any[]>([])
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [exchangeRate, setExchangeRate] = useState(5.4)
+
+  useEffect(() => {
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.rates && data.rates.BRL) {
+          setExchangeRate(data.rates.BRL)
+        }
+      })
+      .catch(err => console.error('Erro ao obter taxa de cambio:', err))
+  }, [])
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -193,7 +205,8 @@ export default function ComprasPage() {
           total_amount: parseFloat(form.total_amount),
           warehouse: isFilial ? 'Dubai' : (form.warehouse || 'Dubai'),
           status: purchaseStatus,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          exchange_rate: exchangeRate
         }])
         .select()
         .single()
@@ -235,7 +248,8 @@ export default function ComprasPage() {
           unit_price: parseFloat(form.unit_price),
           total_amount: parseFloat(form.total_amount),
           status: form.status === 'RECEBIDO' ? 'ENTREGUE' : 'PENDENTE',
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          exchange_rate: exchangeRate
         }])
         if (autoSaleErr) console.error('Erro ao gerar venda automática na Pharmix:', autoSaleErr)
       }
@@ -726,6 +740,11 @@ export default function ComprasPage() {
                       <span className="text-[10px] uppercase font-bold text-muted-foreground">Total do Pedido</span>
                       <div className="font-bold text-primary">{formatCurrency(selectedPurchase.total_amount)}</div>
                     </div>
+                    {selectedPurchase.exchange_rate && parseFloat(selectedPurchase.exchange_rate) > 1 && (
+                      <div className="col-span-2 border-t border-border/40 pt-2 text-[11px] text-muted-foreground font-mono">
+                        Taxa de Câmbio Histórica: 1 USD = R$ {parseFloat(selectedPurchase.exchange_rate).toFixed(4)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Status Edit */}
