@@ -342,21 +342,49 @@ export default function VendasPage() {
     setForm(prev => ({ ...prev, total_amount: total.toFixed(2) }))
   }, [form.quantity, form.unit_price])
 
+  const calculateUnitPriceForSale = async (productId: string, customerName: string) => {
+    const selectedProd = products.find(p => p.id === productId)
+    if (!selectedProd) return 0
+
+    const isFilialUser = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
+    const userFilialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
+
+    if (isFilialUser) {
+      // Filial logged in: selling to end customer in BRL
+      const branchCostUSD = getBranchPrice(selectedProd, userFilialName)
+      const rate = await getExchangeRate()
+      const isTradeFilial = userFilialName === 'trade'
+      const isConnectHealthFilial = userFilialName === 'connecthealth'
+      const isConnectFilial = userFilialName === 'connect'
+      const defaultMarkup = isTradeFilial ? 2 : isConnectHealthFilial ? 1.8 : isConnectFilial ? 1.5 : 1
+      return branchCostUSD * rate * defaultMarkup
+    }
+
+    // Pharmix (Matriz) logged in: selling to a filial or client in USD
+    const custLower = (customerName || '').toLowerCase()
+    let targetBranch: string | null = null
+
+    if (custLower.includes('trade')) targetBranch = 'trade'
+    else if (custLower.includes('connecthealth')) targetBranch = 'connecthealth'
+    else if (custLower.includes('connect')) targetBranch = 'connect'
+    else if (custLower.includes('bioss')) targetBranch = 'bioss'
+
+    if (targetBranch) {
+      // Charge the specific branch price configured for this Filial (e.g. price_connect, price_trade, etc.)
+      return getBranchPrice(selectedProd, targetBranch)
+    }
+
+    // Default sale price for general clients
+    return parseFloat(selectedProd.sale_price || selectedProd.purchase_price || 0)
+  }
+
   const handleProductChange = async (productId: string) => {
     const selectedProd = products.find(p => p.id === productId)
     const isFilial = user?.isFilial || (user?.email && (user.email.endsWith('@trade.com') || user.email.includes('connecthealth') || user.email.includes('connect') || user.email.includes('bioss')))
-    const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : user?.email?.includes('bioss') ? 'bioss' : null)
 
     let finalSalePrice = 0
     if (selectedProd) {
-      const baseBranchCost = getBranchPrice(selectedProd, filialName)
-      if (isFilial) {
-        const rate = await getExchangeRate()
-        // Convert USD cost to BRL with 30% margin (1.30)
-        finalSalePrice = baseBranchCost * rate * 1.30
-      } else {
-        finalSalePrice = parseFloat(selectedProd.sale_price || 0)
-      }
+      finalSalePrice = await calculateUnitPriceForSale(productId, form.customer_name)
     }
 
     // Query active stock per warehouse for this product
@@ -1128,9 +1156,23 @@ export default function VendasPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground uppercase font-medium">Nome do Cliente / Empresa *</label>
                   <Input
-                    placeholder="Ex: Farmácia Popular Centro"
+                    placeholder="Ex: Filial Connect ou Farmácia Popular"
                     value={form.customer_name}
-                    onChange={e => setForm({ ...form, customer_name: e.target.value })}
+                    onChange={async e => {
+                      const newCustName = e.target.value
+                      let newUnitPrice = form.unit_price
+                      if (form.product_id) {
+                        const calculatedPrice = await calculateUnitPriceForSale(form.product_id, newCustName)
+                        if (calculatedPrice > 0) {
+                          newUnitPrice = calculatedPrice.toFixed(2)
+                        }
+                      }
+                      setForm(prev => ({
+                        ...prev,
+                        customer_name: newCustName,
+                        unit_price: newUnitPrice
+                      }))
+                    }}
                     required
                   />
                 </div>
