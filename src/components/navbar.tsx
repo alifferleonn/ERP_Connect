@@ -16,7 +16,8 @@ import {
   Sliders, 
   CheckCircle2, 
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,8 +48,10 @@ export function Navbar() {
   // Notifications State
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loadingNotifications, setLoadingNotifications] = useState(false)
+  const [dismissedIds, setDismissedIds] = useState<string[]>([])
 
   // Settings State
+  const [liveRate, setLiveRate] = useState<number | null>(null)
   const [settings, setSettings] = useState({
     defaultWarehouse: 'Dubai',
     fallbackExchangeRate: '5.40',
@@ -59,17 +62,41 @@ export function Navbar() {
   // Popover container ref for click outside
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  // Load user settings from localStorage on mount
+  const userEmail = user?.email?.toLowerCase() || ''
+  const storageKey = `pharmix_dismissed_notifs_${userEmail || 'guest'}`
+
+  // Load user settings and dismissed notification IDs from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('pharmix_erp_config')
-    if (saved) {
+    const savedConfig = localStorage.getItem('pharmix_erp_config')
+    if (savedConfig) {
       try {
-        setSettings(JSON.parse(saved))
+        setSettings(JSON.parse(savedConfig))
       } catch (e) {
         console.error('Error parsing local settings', e)
       }
     }
-  }, [])
+
+    if (userEmail) {
+      const savedDismissed = localStorage.getItem(storageKey)
+      if (savedDismissed) {
+        try {
+          setDismissedIds(JSON.parse(savedDismissed))
+        } catch (e) {
+          console.error('Error parsing dismissed notifications', e)
+        }
+      }
+    }
+
+    // Fetch live API exchange rate
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.rates?.BRL) {
+          setLiveRate(data.rates.BRL)
+        }
+      })
+      .catch(err => console.error('Erro ao buscar cotação ao vivo:', err))
+  }, [userEmail, storageKey])
 
   // Close popovers on click outside
   useEffect(() => {
@@ -82,77 +109,126 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch live notifications from Supabase
+  // Fetch company-private live notifications from Supabase
   const loadNotifications = async () => {
     setLoadingNotifications(true)
     try {
       const supabase = createClient()
       const list: NotificationItem[] = []
 
-      // 1. Fetch Low Stock Items (quantity <= 5)
-      const { data: lowStock } = await supabase
-        .from('stock')
-        .select('*, products(name)')
-        .lte('quantity', 5)
-        .order('quantity', { ascending: true })
-        .limit(5)
+      const isFilialUser = user?.isFilial || false
+      const filialName = user?.filialName || (userEmail.includes('trade') ? 'trade' : userEmail.includes('connecthealth') ? 'connecthealth' : userEmail.includes('connect') ? 'connect' : userEmail.includes('bioss') ? 'bioss' : null)
 
-      if (lowStock) {
-        lowStock.forEach(item => {
-          list.push({
-            id: `stock-${item.id}`,
-            title: '⚠️ Estoque Crítico',
-            description: `${item.products?.name || 'Medicamento'} em ${item.warehouse || 'Dubai'} tem apenas ${item.quantity} un.`,
-            type: 'stock',
-            link: '/estoque',
-            time: 'Agora'
+      // 1. Low Stock Items (quantity <= 5)
+      // Only Pharmix Matriz manages global central stock, filiais focus on sales/purchases
+      if (!isFilialUser) {
+        const { data: lowStock } = await supabase
+          .from('stock')
+          .select('*, products(name)')
+          .lte('quantity', 5)
+          .order('quantity', { ascending: true })
+          .limit(5)
+
+        if (lowStock) {
+          lowStock.forEach(item => {
+            list.push({
+              id: `stock-${item.id}`,
+              title: '⚠️ Estoque Crítico (Matriz)',
+              description: `${item.products?.name || 'Medicamento'} em ${item.warehouse || 'Dubai'} tem apenas ${item.quantity} un.`,
+              type: 'stock',
+              link: '/estoque',
+              time: 'Agora'
+            })
           })
-        })
+        }
       }
 
-      // 2. Fetch Pending Sales
+      // 2. Pending Sales
       const { data: pendingSales } = await supabase
         .from('sales')
         .select('*')
         .eq('status', 'PENDENTE')
         .order('created_at', { ascending: false })
-        .limit(3)
+        .limit(10)
 
       if (pendingSales) {
         pendingSales.forEach(sale => {
-          list.push({
-            id: `sale-${sale.id}`,
-            title: '📦 Venda Pendente',
-            description: `Venda para ${sale.customer_name?.slice(0, 25)}... aguarda envio.`,
-            type: 'sale',
-            link: '/vendas',
-            time: new Date(sale.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-          })
+          const custNameLower = (sale.customer_name || '').toLowerCase()
+          
+          if (isFilialUser) {
+            // Filial ONLY sees pending sales related to their branch
+            if (filialName && custNameLower.includes(filialName)) {
+              list.push({
+                id: `sale-${sale.id}`,
+                title: '📦 Venda Pendente para Filial',
+                description: `Venda solicitada para ${(filialName).toUpperCase()} aguarda envio.`,
+                type: 'sale',
+                link: '/vendas',
+                time: new Date(sale.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              })
+            }
+          } else {
+            // Pharmix Matriz sees all pending sales to branches/clients
+            list.push({
+              id: `sale-${sale.id}`,
+              title: '📦 Venda Pendente Matriz',
+              description: `Venda para ${sale.customer_name?.slice(0, 25)}... aguarda envio.`,
+              type: 'sale',
+              link: '/vendas',
+              time: new Date(sale.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            })
+          }
         })
       }
 
-      // 3. Fetch Pending Purchases
+      // 3. Pending Purchases
       const { data: pendingPurchases } = await supabase
         .from('purchases')
         .select('*, products(name)')
-        .or('status.ilike.%PENDENTE%')
         .order('created_at', { ascending: false })
-        .limit(3)
+        .limit(15)
 
       if (pendingPurchases) {
         pendingPurchases.forEach(pur => {
-          list.push({
-            id: `pur-${pur.id}`,
-            title: '🛒 Compra Pendente',
-            description: `Pedido de ${pur.products?.name || 'Produto'} (${pur.quantity} un.) aguarda recebimento.`,
-            type: 'purchase',
-            link: '/compras',
-            time: new Date(pur.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-          })
+          const statusStr = pur.status || ''
+          const hasSuffix = statusStr.includes('_')
+          const suffix = hasSuffix ? statusStr.split('_')[1] : null
+
+          if (isFilialUser) {
+            // Filial ONLY sees purchases meant for their branch (e.g. status PENDENTE_trade)
+            if (suffix === filialName) {
+              list.push({
+                id: `pur-${pur.id}`,
+                title: '🛒 Compra Solicitada (Filial)',
+                description: `Pedido de ${pur.products?.name || 'Produto'} (${pur.quantity} un.) enviado à Pharmix.`,
+                type: 'purchase',
+                link: '/compras',
+                time: new Date(pur.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              })
+            }
+          } else {
+            // Pharmix Matriz ONLY sees purchases without suffix or created for Matriz directly
+            if (!suffix || suffix === 'pharmix') {
+              list.push({
+                id: `pur-${pur.id}`,
+                title: '🛒 Compra Pendente Matriz',
+                description: `Pedido de ${pur.products?.name || 'Produto'} (${pur.quantity} un.) aguarda recebimento.`,
+                type: 'purchase',
+                link: '/compras',
+                time: new Date(pur.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              })
+            }
+          }
         })
       }
 
-      setNotifications(list)
+      // Read current dismissed IDs from localStorage to filter out
+      const currentDismissed = localStorage.getItem(storageKey)
+      const dismissedList: string[] = currentDismissed ? JSON.parse(currentDismissed) : []
+
+      // Filter out dismissed notifications
+      const activeNotifications = list.filter(item => !dismissedList.includes(item.id))
+      setNotifications(activeNotifications)
     } catch (err) {
       console.error('Erro ao carregar notificações:', err)
     } finally {
@@ -161,10 +237,29 @@ export function Navbar() {
   }
 
   useEffect(() => {
+    if (!user) return
     loadNotifications()
-    const interval = setInterval(loadNotifications, 45000) // auto-refresh every 45s
+    const interval = setInterval(loadNotifications, 45000)
     return () => clearInterval(interval)
-  }, [])
+  }, [user])
+
+  const handleDismissNotification = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updated = [...dismissedIds, id]
+    setDismissedIds(updated)
+    localStorage.setItem(storageKey, JSON.stringify(updated))
+    setNotifications(prev => prev.filter(item => item.id !== id))
+    toast.success('Alerta descartado')
+  }
+
+  const handleClearAllNotifications = () => {
+    const allIds = notifications.map(item => item.id)
+    const updated = Array.from(new Set([...dismissedIds, ...allIds]))
+    setDismissedIds(updated)
+    localStorage.setItem(storageKey, JSON.stringify(updated))
+    setNotifications([])
+    toast.success('Todas as notificações foram descartadas')
+  }
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -240,7 +335,7 @@ export function Navbar() {
               size="icon"
               onClick={() => setActiveMenu(activeMenu === 'notifications' ? null : 'notifications')}
               className={`relative ${activeMenu === 'notifications' ? 'bg-secondary text-foreground' : ''}`}
-              title="Central de Notificações"
+              title="Central de Notificações da Empresa"
             >
               <Bell className="h-4 w-4" />
               {notifications.length > 0 && (
@@ -254,11 +349,22 @@ export function Navbar() {
                 <div className="p-3 border-b border-border/40 bg-secondary/30 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-bold">Central de Alertas</span>
+                    <span className="text-sm font-bold">Alertas ({user?.isFilial ? badgeInfo.label : 'Pharmix Matriz'})</span>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                    {notifications.length} alertas
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={handleClearAllNotifications}
+                        className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 hover:underline mr-1"
+                        title="Limpar todos os alertas da lista"
+                      >
+                        <Trash2 className="h-3 w-3" /> Limpar Todos
+                      </button>
+                    )}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                      {notifications.length}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="max-h-80 overflow-y-auto divide-y divide-border/20">
@@ -270,7 +376,7 @@ export function Navbar() {
                     <div className="p-6 text-center space-y-1">
                       <CheckCircle2 className="h-6 w-6 text-emerald-500 mx-auto" />
                       <p className="text-xs font-semibold">Tudo sob controle!</p>
-                      <p className="text-[10px] text-muted-foreground">Nenhum estoque crítico ou pedido pendente no momento.</p>
+                      <p className="text-[10px] text-muted-foreground">Nenhum alerta pendente para a sua unidade.</p>
                     </div>
                   ) : (
                     notifications.map(item => (
@@ -280,9 +386,9 @@ export function Navbar() {
                           router.push(item.link)
                           setActiveMenu(null)
                         }}
-                        className="p-3 hover:bg-secondary/60 cursor-pointer transition-colors space-y-1"
+                        className="p-3 hover:bg-secondary/60 cursor-pointer transition-colors space-y-1 group relative"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between pr-6">
                           <span className="text-xs font-bold flex items-center gap-1.5">
                             {item.type === 'stock' && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                             {item.type === 'sale' && <ShoppingBag className="h-3.5 w-3.5 text-indigo-500" />}
@@ -291,7 +397,16 @@ export function Navbar() {
                           </span>
                           <span className="text-[10px] text-muted-foreground font-mono">{item.time}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-snug">{item.description}</p>
+                        <p className="text-xs text-muted-foreground leading-snug pr-6">{item.description}</p>
+                        
+                        {/* Individual Dismiss/Delete Button */}
+                        <button
+                          onClick={(e) => handleDismissNotification(item.id, e)}
+                          className="absolute right-2.5 top-3 p-1 rounded hover:bg-rose-500/20 text-muted-foreground hover:text-rose-400 opacity-60 hover:opacity-100 transition-all"
+                          title="Excluir notificação"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -349,7 +464,10 @@ export function Navbar() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground uppercase text-[10px]">Câmbio Padrão Fallback (USD ➔ BRL)</label>
+                    <div className="flex justify-between items-center">
+                      <label className="font-semibold text-muted-foreground uppercase text-[10px]">Câmbio de Contingência (Fallback)</label>
+                      <span className="text-[10px] text-emerald-500 font-mono font-bold">API Online: R$ {liveRate ? liveRate.toFixed(2) : '5.40'}</span>
+                    </div>
                     <Input
                       type="number"
                       step="0.05"
@@ -357,11 +475,20 @@ export function Navbar() {
                       onChange={e => setSettings({ ...settings, fallbackExchangeRate: e.target.value })}
                       className="h-9 text-xs font-mono"
                     />
+                    <p className="text-[10px] text-muted-foreground">
+                      * O Dólar é puxado **automaticamente em tempo real via API**. Este valor só é usado de reserva caso a internet caia.
+                    </p>
                   </div>
 
                   <div className="bg-secondary/40 p-3 rounded-lg border border-border/40 space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Status Supabase Realtime</span>
+                      <span className="text-muted-foreground">API Cambial (Realtime)</span>
+                      <span className="text-emerald-500 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Online (1 USD = R$ {liveRate ? liveRate.toFixed(2) : '5.40'})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Status Supabase</span>
                       <span className="text-emerald-500 font-bold flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" /> Conectado
                       </span>
