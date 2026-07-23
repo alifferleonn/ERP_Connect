@@ -17,7 +17,8 @@ import {
   CheckCircle2, 
   RefreshCw,
   ShieldCheck,
-  Trash2
+  Trash2,
+  DollarSign
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +53,7 @@ export function Navbar() {
 
   // Settings State
   const [liveRate, setLiveRate] = useState<number | null>(null)
+  const [lastUpdatedTime, setLastUpdatedTime] = useState<string | null>(null)
   const [settings, setSettings] = useState({
     defaultWarehouse: 'Dubai',
     fallbackExchangeRate: '5.40',
@@ -93,6 +95,7 @@ export function Navbar() {
       .then(data => {
         if (data?.rates?.BRL) {
           setLiveRate(data.rates.BRL)
+          setLastUpdatedTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
         }
       })
       .catch(err => console.error('Erro ao buscar cotação ao vivo:', err))
@@ -325,6 +328,22 @@ export function Navbar() {
 
         {/* Action Header Icons & Controls */}
         <div className="flex items-center gap-1.5" ref={popoverRef}>
+          {/* Dollar Rate Live Badge */}
+          <div 
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-500 font-mono text-[11px] leading-none"
+            title={`Cotação Dólar em tempo real via API. Última atualização: ${lastUpdatedTime || 'agora'}`}
+          >
+            <DollarSign className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+            <div className="flex flex-col">
+              <span className="font-bold text-foreground text-[11px]">
+                $1.00 = R$ {liveRate ? liveRate.toFixed(2) : '5.40'}
+              </span>
+              <span className="text-[9px] text-muted-foreground opacity-85 leading-tight">
+                {lastUpdatedTime ? `Atualizado às ${lastUpdatedTime}` : 'Ao vivo'}
+              </span>
+            </div>
+          </div>
+
           {/* Theme Toggle Button */}
           <ThemeToggle />
 
