@@ -14,7 +14,8 @@ import {
   Loader2,
   Bell,
   BellRing,
-  BellOff
+  BellOff,
+  ArrowLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -51,6 +52,7 @@ export default function ChatPage() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [activeTarget, setActiveTarget] = useState<string>('GERAL') // 'GERAL' or contact email
+  const [activeView, setActiveView] = useState<'contacts' | 'chat'>('contacts')
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -246,6 +248,7 @@ export default function ChatPage() {
 
   const handleSelectTarget = (target: string) => {
     setActiveTarget(target)
+    setActiveView('chat')
     const roomMsgIds = messages
       .filter((m) => {
         if (target === 'GERAL') return !m.recipient_email || m.recipient_email === 'GERAL'
@@ -338,7 +341,7 @@ export default function ChatPage() {
       {/* Main Chat Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-[calc(100vh-210px)] min-h-[550px]">
         {/* Left Sidebar: Rooms & Direct Contacts */}
-        <Card className="md:col-span-4 lg:col-span-3 flex flex-col border-border/60 bg-card/70 backdrop-blur-sm shadow-sm overflow-hidden">
+        <Card className={`md:col-span-4 lg:col-span-3 flex flex-col border-border/60 bg-card/70 backdrop-blur-sm shadow-sm overflow-hidden ${activeView === 'contacts' ? 'flex' : 'hidden md:flex'}`}>
           <CardHeader className="p-3 border-b border-border/40 space-y-2">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>Canais e Contatos</span>
@@ -419,10 +422,20 @@ export default function ChatPage() {
         </Card>
 
         {/* Right Section: Main Active Chat Window */}
-        <Card className="md:col-span-8 lg:col-span-9 flex flex-col border-border/60 bg-card/70 backdrop-blur-sm shadow-sm overflow-hidden">
+        <Card className={`md:col-span-8 lg:col-span-9 flex flex-col border-border/60 bg-card/70 backdrop-blur-sm shadow-sm overflow-hidden ${activeView === 'chat' ? 'flex' : 'hidden md:flex'}`}>
           {/* Active Chat Header */}
           <div className="p-3.5 border-b border-border/40 bg-secondary/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
+              {/* Back button for mobile */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setActiveView('contacts')}
+                className="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
               {activeTarget === 'GERAL' ? (
                 <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
                   <Globe className="h-6 w-6" />
