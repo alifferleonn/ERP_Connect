@@ -18,7 +18,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import pharmixLogo from '@/public/pharmix.png'
+import connectSyncLogo from '@/public/Connect Sync.png'
 import tradeLogo from '@/public/trade.webp'
 import connectLogo from '@/public/connect.png'
 import biossLogo from '@/public/bioss.png'
@@ -385,7 +385,7 @@ export default function TVDashboardPage() {
         </div>
         {/* Group Logos */}
         <div className="hidden lg:flex items-center gap-6 bg-white px-5 py-2 rounded border-2 border-zinc-800">
-          <img src={pharmixLogo.src} alt="Pharmix" className="h-8 object-contain" />
+          <img src={connectSyncLogo.src} alt="ConnectSync" className="h-8 object-contain" />
           <img src={tradeLogo.src} alt="Trade" className="h-8 object-contain" />
           <img src={connectLogo.src} alt="Connect" className="h-8 object-contain" />
           <img src={biossLogo.src} alt="Bioss" className="h-8 object-contain" />

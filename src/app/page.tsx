@@ -8,7 +8,6 @@ import {
   Lock, 
   Mail, 
   Loader2, 
-  Sparkles, 
   Eye, 
   EyeOff, 
   ShieldCheck, 
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
+import connectSyncLogo from '@/public/Connect Sync.png'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -77,8 +77,8 @@ export default function LoginPage() {
           <div className="space-y-8">
             {/* Header Brand */}
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-emerald-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 ring-1 ring-white/20">
-                <Sparkles className="h-6 w-6 animate-pulse" />
+              <div className="p-2.5 rounded-2xl bg-white/10 backdrop-blur border border-white/15 shadow-xl shadow-indigo-500/20">
+                <img src={connectSyncLogo.src} alt="ConnectSync Logo" className="h-10 w-auto object-contain" />
               </div>
               <div>
                 <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">

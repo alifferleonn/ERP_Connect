@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
+import connectSyncLogo from '@/public/Connect Sync.png'
 
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -70,10 +71,13 @@ export function Sidebar() {
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 via-indigo-500 to-emerald-500 bg-clip-text text-transparent capitalize">
-            {user?.isSupervisor ? 'ConnectSync - Supervisão' : user?.isFilial ? `ConnectSync - ${user.filialName}` : 'ConnectSync Global'}
-          </h1>
+        <div className="flex items-center justify-between border-b border-border p-3.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src={connectSyncLogo.src} alt="ConnectSync Logo" className="h-7 w-auto object-contain shrink-0" />
+            <h1 className="text-sm font-extrabold bg-gradient-to-r from-purple-400 via-indigo-500 to-emerald-500 bg-clip-text text-transparent capitalize truncate">
+              {user?.isSupervisor ? 'ConnectSync - Supervisão' : user?.isFilial ? `ConnectSync - ${user.filialName}` : 'ConnectSync Global'}
+            </h1>
+          </div>
           <Button
             variant="ghost"
             size="icon"

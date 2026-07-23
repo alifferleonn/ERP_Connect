@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { getBranchPrice } from '@/lib/utils'
-import pharmixLogo from '@/public/pharmix.png'
+import connectSyncLogo from '@/public/Connect Sync.png'
 
 async function getExchangeRate(): Promise<number> {
   if (typeof window === 'undefined') return 5.0
@@ -1888,8 +1888,8 @@ export default function VendasPage() {
               <div className="flex justify-between items-start border-b-2 border-indigo-600 pb-6 mb-6 gap-4">
                 <div className="flex items-start gap-4 flex-1 min-w-0">
                   <img
-                    src={pharmixLogo.src}
-                    alt="Pharmix Logo"
+                    src={connectSyncLogo.src}
+                    alt="ConnectSync Logo"
                     className="h-14 w-auto object-contain shrink-0"
                   />
                   <div className="min-w-0 flex-1">
