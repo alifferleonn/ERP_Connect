@@ -184,7 +184,7 @@ export function Navbar() {
       const supabase = createClient()
       await supabase.auth.signOut()
       toast.success('Sessão encerrada com sucesso!')
-      router.push('/login')
+      window.location.href = '/'
     } catch (err) {
       toast.error('Erro ao sair da conta')
     }
