@@ -137,11 +137,19 @@ export default function LoginPage() {
           {/* Connected Companies Footer Badge */}
           <div className="pt-8 mt-8 border-t border-slate-800/60">
             <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-2">Unidades Conectadas ao ERP:</p>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Pharmix Global</span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Trade Care</span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">Connect Health</span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">Bioss Pharma</span>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Pharmix Global
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Trade Care
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" /> Connect Health
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" /> Bioss Pharma
+              </span>
             </div>
           </div>
         </div>

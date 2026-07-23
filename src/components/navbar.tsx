@@ -267,13 +267,12 @@ export function Navbar() {
 
   const getBranchBadge = () => {
     if (user?.isSupervisor) return { label: '👔 Gerência Geral & Auditoria', bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold' }
-    if (!user?.isFilial) return { label: 'Pharmix Matriz Global', bg: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' }
+    if (!user?.isFilial) return { label: 'Pharmix Global', bg: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' }
     const f = (user?.filialName || '').toLowerCase()
-    if (f.includes('trade')) return { label: 'Filial Trade', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
-    if (f.includes('connecthealth')) return { label: 'Filial ConnectHealth', bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
-    if (f.includes('connect')) return { label: 'Filial Connect', bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' }
-    if (f.includes('bioss')) return { label: 'Filial Bioss', bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' }
-    return { label: 'Filial Conectada', bg: 'bg-secondary text-muted-foreground border-border' }
+    if (f.includes('trade')) return { label: 'Trade Care', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
+    if (f.includes('connect')) return { label: 'Connect Health', bg: 'bg-sky-500/15 text-sky-400 border-sky-500/30' }
+    if (f.includes('bioss')) return { label: 'Bioss Pharma', bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' }
+    return { label: 'Unidade Conectada', bg: 'bg-secondary text-muted-foreground border-border' }
   }
 
   const badgeInfo = getBranchBadge()
