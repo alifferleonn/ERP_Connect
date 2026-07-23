@@ -138,11 +138,10 @@ export default function LoginPage() {
           <div className="pt-8 mt-8 border-t border-slate-800/60">
             <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-2">Unidades Conectadas ao ERP:</p>
             <div className="flex flex-wrap gap-1.5">
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Pharmix Matriz</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Filial Trade</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">Filial Connect</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">ConnectHealth</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">Filial Bioss</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Pharmix Global</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Trade Care</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">Connect Health</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">Bioss Pharma</span>
             </div>
           </div>
         </div>
