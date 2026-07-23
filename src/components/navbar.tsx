@@ -266,6 +266,7 @@ export function Navbar() {
   }
 
   const getBranchBadge = () => {
+    if (user?.isSupervisor) return { label: '👔 Gerência Geral & Auditoria', bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold' }
     if (!user?.isFilial) return { label: 'Pharmix Matriz Global', bg: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' }
     const f = (user?.filialName || '').toLowerCase()
     if (f.includes('trade')) return { label: 'Filial Trade', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
@@ -458,8 +459,8 @@ export function Navbar() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Nível de Acesso:</span>
                     <span className="font-semibold text-foreground flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
-                      {user?.isFilial ? 'Gestor de Filial' : 'Administrador Matriz'}
+                      <ShieldCheck className="h-3.5 w-3.5 text-purple-400" />
+                      {user?.isSupervisor ? 'Supervisão Geral & Auditoria' : user?.isFilial ? 'Gestor de Filial' : 'Administrador Matriz'}
                     </span>
                   </div>
                 </div>

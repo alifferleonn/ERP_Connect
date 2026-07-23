@@ -269,6 +269,9 @@ export default function VendasPage() {
       const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connecthealth') ? 'connecthealth' : user?.email?.includes('connect') ? 'connect' : null)
 
       const visibleSales = (data || []).filter((sale: any) => {
+        if (user?.isSupervisor) {
+          return true // Show ALL sales from all branches to Supervisor
+        }
         if (isFilial) {
           try {
             const parsed = JSON.parse(sale.customer_name)
@@ -314,11 +317,22 @@ export default function VendasPage() {
     try {
       const supabase = createClient()
       const [supsRes, clientsRes] = await Promise.all([
-        supabase.from('suppliers').select('id, company'),
+        supabase.from('suppliers').select('id, company').neq('country', 'Cliente'),
         supabase.from('suppliers').select('*').eq('country', 'Cliente')
       ])
       setSuppliers(supsRes.data || [])
-      setClients(clientsRes.data || [])
+
+      const isFilialUser = user?.isFilial || false
+      const filialName = user?.filialName
+      const filteredClients = (clientsRes.data || []).filter((c: any) => {
+        if (user?.isSupervisor) return true
+        const notes = (c.notes || '').toLowerCase()
+        if (isFilialUser) {
+          return notes.includes(`[branch:${filialName}]`) || notes.includes(filialName || '')
+        }
+        return !notes.includes('[branch:') || notes.includes('[branch:pharmix]')
+      })
+      setClients(filteredClients)
     } catch (err) {
       console.error(err)
     }
@@ -951,28 +965,41 @@ export default function VendasPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {user?.isSupervisor && (
+        <div className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-4 rounded-xl flex items-center justify-between gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="text-base">👔</span>
+            <span>
+              <strong>Modo Supervisão &amp; Auditoria:</strong> Você possui visão 360° de todas as vendas registradas no grupo (Matriz Pharmix + Filiais Trade, Connect, ConnectHealth e Bioss). Lançamentos e alterações de dados estão bloqueados para auditoria.
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Vendas
+            Vendas {user?.isSupervisor ? '(Todas as Unidades)' : ''}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie vendas em {user?.isFilial ? 'reais (R$ BRL)' : 'dólares ($ USD)'}. Clique em um registro para atualizar o status de entrega ou excluir.
+            Gerencie vendas em {user?.isFilial ? 'reais (R$ BRL)' : 'dólares ($ USD)'}. Clique em um registro para visualizar detalhes.
           </p>
         </div>
-        <Button
-          className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
-          onClick={() => {
-            setShowAutoPurchasePanel(false);
-            setDeficitInfo(null);
-            setProductSearch('');
-            setShowProductSuggestions(false);
-            setIsModalOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Registrar Venda
-        </Button>
+        {!user?.isSupervisor && (
+          <Button
+            className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
+            onClick={() => {
+              setShowAutoPurchasePanel(false);
+              setDeficitInfo(null);
+              setProductSearch('');
+              setShowProductSuggestions(false);
+              setIsModalOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Registrar Venda
+          </Button>
+        )}
       </div>
 
       {/* Metrics Row */}

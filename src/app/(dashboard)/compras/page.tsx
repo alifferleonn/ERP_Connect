@@ -92,6 +92,9 @@ export default function ComprasPage() {
       const filialName = user?.filialName || (user?.email?.includes('trade') ? 'trade' : user?.email?.includes('connect') ? 'connect' : null)
 
       const visiblePurchases = (data || []).filter((purchase: any) => {
+        if (user?.isSupervisor) {
+          return true // Show ALL purchases from all branches to Supervisor
+        }
         const statusStr = purchase.status || ''
         const hasSuffix = statusStr.includes('_')
         const suffix = hasSuffix ? statusStr.split('_')[1] : null
@@ -115,7 +118,7 @@ export default function ComprasPage() {
     try {
       const supabase = createClient()
       const [supsRes, prodsRes] = await Promise.all([
-        supabase.from('suppliers').select('id, company'),
+        supabase.from('suppliers').select('id, company').neq('country', 'Cliente'),
         supabase.from('products').select('id, name, purchase_price, sale_price, price_trade, price_connect, price_bioss, supplier_id')
       ])
       setSuppliers(supsRes.data || [])
@@ -431,22 +434,35 @@ export default function ComprasPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {user?.isSupervisor && (
+        <div className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-4 rounded-xl flex items-center justify-between gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="text-base">👔</span>
+            <span>
+              <strong>Modo Supervisão &amp; Auditoria:</strong> Você possui visão 360° de todos os pedidos de compras da Matriz e das solicitações das filiais. Lançamentos de ordens de compra estão desativados para auditoria.
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Compras Internacionais
+            Compras {user?.isSupervisor ? '(Todas as Unidades)' : 'Internacionais'}
           </h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie compras internacionais em dólares ($ USD). Alterar status para &quot;RECEBIDO&quot; dará entrada automática no estoque.
+            Gerencie compras internacionais em dólares ($ USD). Clique em um registro para visualizar detalhes.
           </p>
         </div>
-        <Button 
-          className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
-          onClick={() => setIsModalOpen(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Registrar Compra
-        </Button>
+        {!user?.isSupervisor && (
+          <Button 
+            className="transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Pedido de Compra
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-4">

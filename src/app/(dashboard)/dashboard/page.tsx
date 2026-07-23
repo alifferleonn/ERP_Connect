@@ -323,6 +323,9 @@ export default function Page() {
 
         // Calculate global cash stats by branch (ignoring date filters)
         const branchSales = (salesData || []).filter((s) => {
+          if (user?.isSupervisor) {
+            return true // Include all sales from all branches for Supervisor
+          }
           if (isFilial) {
             try {
               const parsed = JSON.parse(s.customer_name)
@@ -341,6 +344,9 @@ export default function Page() {
         })
 
         const branchPurchases = (purchasesData || []).filter((p) => {
+          if (user?.isSupervisor) {
+            return true // Include all purchases from all branches for Supervisor
+          }
           const statusStr = p.status || ''
           const hasSuffix = statusStr.includes('_')
           const suffix = hasSuffix ? statusStr.split('_')[1] : null
@@ -552,13 +558,26 @@ export default function Page() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {user?.isSupervisor && (
+        <div className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-4 rounded-xl flex items-center justify-between gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="text-base">👔</span>
+            <span>
+              <strong>Visão Gerencial 360° (Supervisão &amp; Auditoria):</strong> Exibindo consolidado em tempo real da Matriz Pharmix e de todas as Filiais.
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Dashboard {user?.isFilial && ` - ${user.filialName?.toUpperCase()}`}
+            Dashboard {user?.isSupervisor ? 'Visão 360° (Gerência)' : user?.isFilial ? ` - ${user.filialName?.toUpperCase()}` : ''}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {isFilial 
+            {user?.isSupervisor
+              ? 'Consolidado gerencial completo de faturamento, estoque e compras do grupo.'
+              : isFilial 
               ? 'Visão geral com dados e valores em reais (R$ BRL) convertidos a cada 1 hora.'
               : 'Visão geral com dados e valores em dólares ($ USD) reais do seu Supabase.'
             }

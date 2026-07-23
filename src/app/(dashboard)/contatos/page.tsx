@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Search, X, Loader2, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
+import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
 
 export default function ContatosPage() {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [contacts, setContacts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -41,7 +43,19 @@ export default function ContatosPage() {
 
       const { data, error } = await query.order('company', { ascending: true })
       if (error) throw error
-      setContacts(data || [])
+
+      const isFilialUser = user?.isFilial || false
+      const filialName = user?.filialName
+      const filteredContacts = (data || []).filter((c: any) => {
+        if (user?.isSupervisor) return true
+        const notes = (c.notes || '').toLowerCase()
+        if (isFilialUser) {
+          return notes.includes(`[branch:${filialName}]`) || notes.includes(filialName || '')
+        }
+        return !notes.includes('[branch:') || notes.includes('[branch:pharmix]')
+      })
+
+      setContacts(filteredContacts)
     } catch (err: any) {
       console.error('Error loading contacts:', err)
       toast.error('Erro ao carregar contatos')
@@ -52,7 +66,7 @@ export default function ContatosPage() {
 
   useEffect(() => {
     loadContacts()
-  }, [search])
+  }, [search, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,6 +78,9 @@ export default function ContatosPage() {
     setIsSaving(true)
     try {
       const supabase = createClient()
+      const branchTag = user?.isSupervisor ? 'pharmix' : user?.isFilial ? user.filialName : 'pharmix'
+      const formattedNotes = form.notes.includes('[branch:') ? form.notes : `[branch:${branchTag}] ${form.notes}`.trim()
+
       if (selectedContact) {
         // Edit contact
         const { error } = await supabase
@@ -73,7 +90,7 @@ export default function ContatosPage() {
             contact: form.contact,
             email: form.email,
             phone: form.phone,
-            notes: form.notes,
+            notes: formattedNotes,
             cpf: form.cpf,
           })
           .eq('id', selectedContact.id)
@@ -88,7 +105,7 @@ export default function ContatosPage() {
             contact: form.contact,
             email: form.email,
             phone: form.phone,
-            notes: form.notes,
+            notes: formattedNotes,
             country: 'Cliente',
             cpf: form.cpf,
           }])

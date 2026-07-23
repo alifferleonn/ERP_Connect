@@ -74,7 +74,7 @@ export default function ProductsPage() {
   async function loadSuppliers() {
     try {
       const supabase = createClient()
-      const { data: sups, error } = await supabase.from('suppliers').select('id, company')
+      const { data: sups, error } = await supabase.from('suppliers').select('id, company').neq('country', 'Cliente')
       if (error) throw error
       setSuppliers(sups || [])
     } catch (err) {

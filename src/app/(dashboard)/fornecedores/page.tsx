@@ -45,7 +45,7 @@ export default function FornecedoresPage() {
     setIsLoading(true)
     try {
       const supabase = createClient()
-      let query = supabase.from('suppliers').select('*')
+      let query = supabase.from('suppliers').select('*').neq('country', 'Cliente')
       if (search) {
         query = query.or(`company.ilike.%${search}%,contact.ilike.%${search}%,country.ilike.%${search}%`)
       }

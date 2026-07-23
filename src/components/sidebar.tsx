@@ -29,7 +29,17 @@ export function Sidebar() {
     return () => window.removeEventListener('toggle-sidebar', handleToggle)
   }, [])
 
-  const currentMenuItems = user?.isFilial
+  const currentMenuItems = user?.isSupervisor
+    ? [
+        { href: '/dashboard', label: 'Dashboard 360°', icon: BarChart3 },
+        { href: '/produtos', label: 'Produtos', icon: Box },
+        { href: '/compras', label: 'Compras', icon: ShoppingCart },
+        { href: '/fornecedores', label: 'Fornecedores', icon: Users },
+        { href: '/estoque', label: 'Estoque Global', icon: Boxes },
+        { href: '/vendas', label: 'Vendas (Todas)', icon: DollarSign },
+        { href: '/chat', label: 'Bate-Papo Realtime', icon: MessageSquare },
+      ]
+    : user?.isFilial
     ? [
         { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
         { href: '/produtos', label: 'Produtos', icon: Box },
@@ -61,8 +71,8 @@ export function Sidebar() {
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-4">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-emerald-500 bg-clip-text text-transparent capitalize">
-            {user?.isFilial ? `Pharmix - ${user.filialName}` : 'Pharmix Global'}
+          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 via-indigo-500 to-emerald-500 bg-clip-text text-transparent capitalize">
+            {user?.isSupervisor ? 'Pharmix - Supervisão' : user?.isFilial ? `Pharmix - ${user.filialName}` : 'Pharmix Global'}
           </h1>
           <Button
             variant="ghost"

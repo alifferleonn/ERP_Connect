@@ -484,7 +484,7 @@ export default function EstoquePage() {
 
 
 
-  if (loading || user?.isFilial) {
+  if (loading || (user?.isFilial && !user?.isSupervisor)) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="animate-pulse text-muted-foreground text-sm font-semibold">
@@ -498,13 +498,22 @@ export default function EstoquePage() {
   const totalIncomingQuantity = incomingPurchases.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
 
   return (
-
-
     <div className="space-y-8 animate-in fade-in duration-500">
+      {user?.isSupervisor && (
+        <div className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-4 rounded-xl flex items-center justify-between gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="text-base">👔</span>
+            <span>
+              <strong>Modo Supervisão &amp; Auditoria:</strong> Você possui visão 360° do estoque físico global de todos os armazéns (Dubai, Uruguai e Panamá).
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Estoque
+            Estoque {user?.isSupervisor ? 'Global (Todos os Armazéns)' : ''}
           </h1>
           <p className="text-muted-foreground text-sm">
             Rastreamento de lotes, controle de movimentações e acompanhamento de itens a receber.

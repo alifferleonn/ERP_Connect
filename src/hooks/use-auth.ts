@@ -7,6 +7,7 @@ export interface UserSession {
   email: string
   name: string
   isFilial: boolean
+  isSupervisor: boolean
   filialName: 'trade' | 'connect' | 'connecthealth' | null
 }
 
@@ -22,13 +23,15 @@ export function useAuth() {
         const { data: { user: supabaseUser } } = await supabase.auth.getUser()
         if (supabaseUser && supabaseUser.email) {
           const email = supabaseUser.email.toLowerCase()
-          const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect')
-          const filialName = email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null
+          const isSupervisor = email === 'admin@gerencia.com' || email.includes('gerencia') || email.includes('supervisor') || email.includes('auditoria')
+          const isFilial = !isSupervisor && (email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect'))
+          const filialName = isSupervisor ? null : (email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null)
 
           setUser({
             email: supabaseUser.email,
-            name: supabaseUser.user_metadata?.name || supabaseUser.email.split('@')[0],
+            name: supabaseUser.user_metadata?.name || (isSupervisor ? 'Gerência Geral' : supabaseUser.email.split('@')[0]),
             isFilial,
+            isSupervisor,
             filialName,
           })
         } else {
@@ -47,13 +50,15 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.email) {
         const email = session.user.email.toLowerCase()
-        const isFilial = email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect')
-        const filialName = email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null
+        const isSupervisor = email === 'admin@gerencia.com' || email.includes('gerencia') || email.includes('supervisor') || email.includes('auditoria')
+        const isFilial = !isSupervisor && (email === 'acesso3@trade.com' || email.endsWith('@trade.com') || email.includes('connecthealth') || email.includes('connect'))
+        const filialName = isSupervisor ? null : (email.includes('trade') ? 'trade' : email.includes('connecthealth') ? 'connecthealth' : email.includes('connect') ? 'connect' : null)
 
         setUser({
           email: session.user.email,
-          name: session.user.user_metadata?.name || session.user.email.split('@')[0],
+          name: session.user.user_metadata?.name || (isSupervisor ? 'Gerência Geral' : session.user.email.split('@')[0]),
           isFilial,
+          isSupervisor,
           filialName,
         })
       } else {
