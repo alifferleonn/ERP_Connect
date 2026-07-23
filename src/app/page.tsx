@@ -46,7 +46,7 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      toast.success('Autenticado com sucesso! Entrando no Pharmix ERP...')
+      toast.success('Autenticado com sucesso! Entrando no ConnectSync ERP...')
       router.push('/dashboard')
       router.refresh()
     } catch (err: any) {
@@ -82,7 +82,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-                  Pharmix Global
+                  ConnectSync
                 </h1>
                 <span className="text-[11px] font-semibold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Enterprise ERP
@@ -139,7 +139,7 @@ export default function LoginPage() {
             <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-2">Unidades Conectadas ao ERP:</p>
             <div className="flex flex-wrap gap-2">
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5 shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Pharmix Global
+                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> ConnectSync Global
               </span>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Trade Care
@@ -173,7 +173,7 @@ export default function LoginPage() {
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     type="email"
-                    placeholder="usuario@pharmix.com"
+                    placeholder="usuario@connectsync.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     className="pl-10 h-11 bg-slate-950/60 border-slate-800 text-slate-100 text-xs focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent placeholder:text-slate-600 transition-all"
@@ -231,7 +231,7 @@ export default function LoginPage() {
             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
               <ShieldCheck className="h-3.5 w-3.5" /> Supabase Encrypted SSL
             </span>
-            <span>Pharmix v2.4 (2026)</span>
+            <span>ConnectSync v2.4 (2026)</span>
           </div>
         </div>
 

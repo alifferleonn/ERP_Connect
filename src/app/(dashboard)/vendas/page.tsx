@@ -61,12 +61,12 @@ export default function VendasPage() {
     const customerInfo = parseCustomerInfo(sale.customer_name)
 
     const initialData = {
-      invoice_number: `INV-PHX-${(sale.id || '00000000').slice(0, 8).toUpperCase()}`,
-      company_name: 'Pharmix Global',
-      company_sub: 'Global Pharmaceutical Supply Chain',
+      invoice_number: `INV-CS-${(sale.id || '00000000').slice(0, 8).toUpperCase()}`,
+      company_name: 'ConnectSync Global',
+      company_sub: 'Global Enterprise & Supply Chain System',
       company_address: 'Matriz: Dubai International Free Zone, UAE | Panamá & Uruguai',
-      company_email: 'support@pharmix.com',
-      company_website: 'www.pharmix.com',
+      company_email: 'support@connectsync.com',
+      company_website: 'www.connectsync.com',
       customer_name: customerInfo.name || 'Cliente / Filial',
       customer_cpf: customerInfo.cpf || '',
       customer_email: customerInfo.email || '',
@@ -77,7 +77,7 @@ export default function VendasPage() {
       quantity: sale.quantity || 1,
       unit_price: sale.unit_price || 0,
       total_amount: sale.total_amount || ((sale.quantity || 1) * (sale.unit_price || 0)),
-      notes: 'Obrigado por sua preferência. Esta Invoice é emitida pelo ERP Pharmix Global.',
+      notes: 'Obrigado por sua preferência. Esta Invoice é emitida pelo ERP ConnectSync.',
       issue_date: new Date(sale.created_at || Date.now()).toLocaleDateString('pt-BR'),
       issue_time: new Date(sale.created_at || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       exchange_rate: sale.exchange_rate || null

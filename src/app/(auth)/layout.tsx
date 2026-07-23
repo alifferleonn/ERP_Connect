@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Autenticação | Pharmix Global',
-  description: 'Sistema de autenticação do ERP Pharmix Global',
+  title: 'Autenticação | ConnectSync',
+  description: 'Sistema de autenticação do ERP ConnectSync',
 }
 
 export default function AuthLayout({

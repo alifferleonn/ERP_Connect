@@ -72,7 +72,7 @@ export function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-4">
           <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 via-indigo-500 to-emerald-500 bg-clip-text text-transparent capitalize">
-            {user?.isSupervisor ? 'Pharmix - Supervisão' : user?.isFilial ? `Pharmix - ${user.filialName}` : 'Pharmix Global'}
+            {user?.isSupervisor ? 'ConnectSync - Supervisão' : user?.isFilial ? `ConnectSync - ${user.filialName}` : 'ConnectSync Global'}
           </h1>
           <Button
             variant="ghost"

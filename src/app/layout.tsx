@@ -4,10 +4,10 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import '@/app/globals.css'
 
 export const metadata: Metadata = {
-  title: 'Pharmix Global - ERP Farmacêutico',
-  description: 'Sistema completo de gestão de ERP para empresas farmacêuticas',
+  title: 'ConnectSync - ERP Gestão & Multimoeda',
+  description: 'Sistema completo de gestão ERP para empresas e filiais',
   keywords:
-    'ERP, farmacêutico, gestão, estoque, vendas, compras, suprimentos',
+    'ERP, ConnectSync, gestão, estoque, vendas, compras, suprimentos',
 }
 
 const COLORS = {

@@ -291,10 +291,11 @@ export default function Page() {
         }
 
         const branchLabels: Record<string, string> = {
-          pharmix: 'Matriz Pharmix',
-          trade: 'Filial Trade',
-          connect: 'Filial Connect',
-          connecthealth: 'Filial ConnectHealth',
+          pharmix: 'ConnectSync Matriz',
+          trade: 'Trade Care',
+          connect: 'Connect Health',
+          connecthealth: 'Connect Health',
+          bioss: 'Bioss Pharma'
         }
 
         const branchDataList = Object.entries(branchBillingMap).map(([branch, value]) => ({

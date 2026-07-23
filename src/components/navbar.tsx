@@ -345,7 +345,7 @@ export function Navbar() {
                 <div className="p-3 border-b border-border/40 bg-secondary/30 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-bold">Alertas ({user?.isFilial ? badgeInfo.label : 'Pharmix Matriz'})</span>
+                    <span className="text-sm font-bold">Alertas ({user?.isFilial ? badgeInfo.label : 'ConnectSync Matriz'})</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {notifications.length > 0 && (
@@ -442,7 +442,7 @@ export function Navbar() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="text-sm font-bold truncate leading-tight">{user?.name || 'Usuário'}</h4>
-                    <p className="text-[11px] text-muted-foreground truncate">{user?.email || 'usuario@pharmix.com'}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{user?.email || 'usuario@connectsync.com'}</p>
                   </div>
                 </div>
 
