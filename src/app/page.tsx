@@ -117,11 +117,9 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Accounts info */}
-          <div className="mt-8 pt-6 border-t border-slate-800/80 text-center text-[10px] text-slate-500 space-y-1">
-            <p>Acesso via Supabase Auth:</p>
-            <p className="font-mono text-slate-400">acesso1@gmail.com | acesso02@gmail.com</p>
-            <p className="text-[9px] text-slate-500">Certifique-se de criar estes usuários na aba Auth do seu Supabase</p>
+          {/* Footer */}
+          <div className="mt-8 pt-6 border-t border-slate-800/80 text-center text-[11px] text-slate-500">
+            <p>© {new Date().getFullYear()} Pharmix Global ERP. Todos os direitos reservados.</p>
           </div>
         </CardContent>
       </Card>
