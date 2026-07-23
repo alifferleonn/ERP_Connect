@@ -5,15 +5,12 @@ import { useRouter } from 'next/navigation'
 import { 
   Bell, 
   Search, 
-  Settings, 
   User, 
   Menu, 
-  X, 
   LogOut, 
   AlertTriangle, 
   Package, 
   ShoppingBag, 
-  Sliders, 
   CheckCircle2, 
   RefreshCw,
   ShieldCheck,
@@ -41,7 +38,7 @@ export function Navbar() {
   const { user } = useAuth()
   
   // Modals / Popovers State
-  const [activeMenu, setActiveMenu] = useState<'notifications' | 'settings' | 'profile' | null>(null)
+  const [activeMenu, setActiveMenu] = useState<'notifications' | 'profile' | null>(null)
   
   // Search State
   const [searchQuery, setSearchQuery] = useState('')
@@ -51,15 +48,9 @@ export function Navbar() {
   const [loadingNotifications, setLoadingNotifications] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
 
-  // Settings State
+  // Exchange Rate State
   const [liveRate, setLiveRate] = useState<number | null>(null)
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string | null>(null)
-  const [settings, setSettings] = useState({
-    defaultWarehouse: 'Dubai',
-    fallbackExchangeRate: '5.40',
-    compactView: false,
-    autoRefresh: true
-  })
 
   // Popover container ref for click outside
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -67,16 +58,8 @@ export function Navbar() {
   const userEmail = user?.email?.toLowerCase() || ''
   const storageKey = `pharmix_dismissed_notifs_${userEmail || 'guest'}`
 
-  // Load user settings and dismissed notification IDs from localStorage
+  // Load dismissed notification IDs from localStorage
   useEffect(() => {
-    const savedConfig = localStorage.getItem('pharmix_erp_config')
-    if (savedConfig) {
-      try {
-        setSettings(JSON.parse(savedConfig))
-      } catch (e) {
-        console.error('Error parsing local settings', e)
-      }
-    }
 
     if (userEmail) {
       const savedDismissed = localStorage.getItem(storageKey)
@@ -271,12 +254,6 @@ export function Navbar() {
     }
   }
 
-  const handleSaveSettings = () => {
-    localStorage.setItem('pharmix_erp_config', JSON.stringify(settings))
-    toast.success('Configurações salvas no navegador com sucesso!')
-    setActiveMenu(null)
-  }
-
   const handleLogout = async () => {
     try {
       const supabase = createClient()
@@ -443,95 +420,7 @@ export function Navbar() {
             )}
           </div>
 
-          {/* 2. Settings Button */}
-          <div className="relative">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => setActiveMenu(activeMenu === 'settings' ? null : 'settings')}
-              className={activeMenu === 'settings' ? 'bg-secondary text-foreground' : ''}
-              title="Configurações do ERP"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-
-            {/* Settings Modal Popover */}
-            {activeMenu === 'settings' && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-card border border-border/80 rounded-xl shadow-xl z-50 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Sliders className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-bold">Configurações do Sistema</h3>
-                  </div>
-                  <button onClick={() => setActiveMenu(null)} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-muted-foreground uppercase text-[10px]">Armazém Principal Padrão</label>
-                    <select
-                      value={settings.defaultWarehouse}
-                      onChange={e => setSettings({ ...settings, defaultWarehouse: e.target.value })}
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs"
-                    >
-                      <option value="Dubai">Dubai (Matriz Principal)</option>
-                      <option value="Uruguai">Uruguai (Zona Franca)</option>
-                      <option value="Panamá">Panamá (Hub Logístico)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <label className="font-semibold text-muted-foreground uppercase text-[10px]">Câmbio de Contingência (Fallback)</label>
-                      <span className="text-[10px] text-emerald-500 font-mono font-bold">API Online: R$ {liveRate ? liveRate.toFixed(2) : '5.40'}</span>
-                    </div>
-                    <Input
-                      type="number"
-                      step="0.05"
-                      value={settings.fallbackExchangeRate}
-                      onChange={e => setSettings({ ...settings, fallbackExchangeRate: e.target.value })}
-                      className="h-9 text-xs font-mono"
-                    />
-                    <p className="text-[10px] text-muted-foreground">
-                      * O Dólar é puxado **automaticamente em tempo real via API**. Este valor só é usado de reserva caso a internet caia.
-                    </p>
-                  </div>
-
-                  <div className="bg-secondary/40 p-3 rounded-lg border border-border/40 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">API Cambial (Realtime)</span>
-                      <span className="text-emerald-500 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Online (1 USD = R$ {liveRate ? liveRate.toFixed(2) : '5.40'})
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Status Supabase</span>
-                      <span className="text-emerald-500 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Conectado
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Versão do Sistema</span>
-                      <span className="font-mono font-semibold">Pharmix v2.4 (2026)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
-                  <Button size="sm" variant="outline" onClick={() => setActiveMenu(null)}>
-                    Cancelar
-                  </Button>
-                  <Button size="sm" onClick={handleSaveSettings}>
-                    Salvar Alterações
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3. User Profile Button */}
+          {/* User Profile Button */}
           <div className="relative">
             <Button 
               variant="ghost" 
