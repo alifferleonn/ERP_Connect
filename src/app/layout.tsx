@@ -68,12 +68,10 @@ export default function RootLayout({
                 .map(([key, value]) => `${key}: ${value};`)
                 .join('\n')}
             }
-            @media (prefers-color-scheme: dark) {
-              :root {
-                ${Object.entries(COLORS.dark)
-                  .map(([key, value]) => `${key}: ${value};`)
-                  .join('\n')}
-              }
+            html[class~="light"] {
+              ${Object.entries(COLORS.light)
+                .map(([key, value]) => `${key}: ${value};`)
+                .join('\n')}
             }
             html[class~="dark"] {
               ${Object.entries(COLORS.dark)
